@@ -19,4 +19,4 @@ window.FIREBASE_CONFIG = {
 
 // Ixtiyoriy: shu ro'yxatdagi email'lar "🏫 Maktab nazorati" panelini ko'radi
 // (barcha laoshilar va ularning test sonlarini ko'rish uchun). Kerak bo'lmasa bo'sh qoldiring.
-window.SUPER_ADMIN_EMAILS = [unar00@mail.ru];   // masalan: ["direktor@maktab.uz"]
+window.SUPER_ADMIN_EMAILS = ["unar00@mail.ru"];   // masalan: ["direktor@maktab.uz"]
