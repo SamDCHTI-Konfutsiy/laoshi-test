@@ -220,8 +220,10 @@ function adminRoute(){
       renderAdmin();
     });
   } else {
-    db.ref('teachers').once('value').then(snap=>{
-      if(!snap.exists()) renderBootstrap();
+    // "teachers" tizimga kirmasdan o'qib bo'lmaydi (maxfiylik uchun), shu sabab bootstrap holatini
+    // alohida ochiq bayroq (system/bootstrapped) orqali tekshiramiz.
+    db.ref('system/bootstrapped').once('value').then(snap=>{
+      if(!snap.val()) renderBootstrap();
       else { authMode='login'; renderAuthGate(); }
     });
   }
@@ -322,8 +324,12 @@ function doBootstrap(){
   authMsg('');
   authBusy = true;
   auth.createUserWithEmailAndPassword(email, pass).then(cred=>{
-    return cred.user.updateProfile({displayName:name}).then(()=>
-      db.ref('teachers/'+cred.user.uid).set({name, email, role:'admin', active:true, createdAt:Date.now()}));
+    return cred.user.updateProfile({displayName:name}).then(()=>{
+      const updates = {};
+      updates['teachers/'+cred.user.uid] = {name, email, role:'admin', active:true, createdAt:Date.now()};
+      updates['system/bootstrapped'] = true;
+      return db.ref().update(updates);
+    });
   }).then(()=>{
     authBusy = false; currentUser = auth.currentUser; adminRoute();
   }).catch(e=>{ authBusy = false; authMsg(friendlyAuthError(e.code)); });
