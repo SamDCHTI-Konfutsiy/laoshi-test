@@ -1,0 +1,57 @@
+name: Deploy Laoshi Test saytini nashr qilish
+
+# Bu workflow config.js faylini GitHub Secrets'dan yaratadi va shu holatda
+# nashr qiladi — haqiqiy Firebase qiymatlari hech qachon repozitoriyga
+# (git tarixiga) yozilmaydi, faqat vaqtinchalik build jarayonida mavjud bo'ladi.
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repozitoriyni olish
+        uses: actions/checkout@v4
+
+      - name: config.js ni Secrets asosida yaratish
+        run: |
+          cat > config.js <<EOF
+          window.FIREBASE_CONFIG = {
+            apiKey: "${{ secrets.FIREBASE_API_KEY }}",
+            authDomain: "${{ secrets.FIREBASE_AUTH_DOMAIN }}",
+            databaseURL: "${{ secrets.FIREBASE_DB_URL }}",
+            projectId: "${{ secrets.FIREBASE_PROJECT_ID }}",
+            storageBucket: "${{ secrets.FIREBASE_STORAGE_BUCKET }}",
+            messagingSenderId: "${{ secrets.FIREBASE_MSG_SENDER_ID }}",
+            appId: "${{ secrets.FIREBASE_APP_ID }}"
+          };
+          window.SUPER_ADMIN_EMAILS = ${{ secrets.SUPER_ADMIN_EMAILS || '[]' }};
+          EOF
+
+      - name: Sayt paketini tayyorlash
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: GitHub Pages'ga joylash
+        id: deployment
+        uses: actions/deploy-pages@v4

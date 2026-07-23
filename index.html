@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>老师 Test — Laoshi nazorat platformasi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F6F5F1; --card:#FFFFFF; --ink:#212A33; --ink-soft:#5A6672;
+  --line:#E3E1DA; --red:#BE3A2B; --red-soft:#F7E8E5; --jade:#2F7D5B; --jade-soft:#E6F2EC;
+  --amber:#D08B0B; --amber-soft:#FBF1DC; --blue:#3D6B8E; --blue-soft:#E7EFF5;
+  --r:12px; --shadow:0 2px 10px rgba(33,42,51,.07);
+  --serif:'Noto Serif SC',serif; --sans:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55;min-height:100vh}
+.wrap{max-width:1080px;margin:0 auto;padding:24px 16px 80px}
+.narrow{max-width:640px}
+h1,h2,h3{font-family:var(--serif)}
+h1{font-size:26px} h2{font-size:20px;margin-bottom:12px} h3{font-size:16px}
+.muted{color:var(--ink-soft);font-size:13.5px}
+.hidden{display:none!important}
+
+/* seal logo */
+.seal{width:44px;height:44px;background:var(--red);color:#fff;border-radius:9px;
+  display:flex;align-items:center;justify-content:center;font-family:var(--serif);
+  font-weight:900;font-size:24px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.35);flex:none}
+.brand{display:flex;align-items:center;gap:12px;margin-bottom:28px}
+.brand small{display:block;color:var(--ink-soft);font-size:12.5px}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:var(--shadow);padding:22px;margin-bottom:16px}
+
+button{font-family:var(--sans);font-size:14.5px;font-weight:600;border:none;border-radius:9px;
+  padding:10px 18px;cursor:pointer;transition:.15s}
+.btn-p{background:var(--ink);color:#fff}.btn-p:hover{background:#37424e}
+.btn-red{background:var(--red);color:#fff}.btn-red:hover{background:#a32e21}
+.btn-jade{background:var(--jade);color:#fff}.btn-jade:hover{background:#256648}
+.btn-ghost{background:transparent;border:1.5px solid var(--line);color:var(--ink)}
+.btn-ghost:hover{border-color:var(--ink)}
+.btn-sm{padding:6px 12px;font-size:13px;border-radius:7px}
+button:disabled{opacity:.45;cursor:not-allowed}
+
+input,textarea,select{width:100%;font-family:var(--sans);font-size:14.5px;color:var(--ink);
+  background:#fff;border:1.5px solid var(--line);border-radius:9px;padding:10px 12px;outline:none}
+input:focus,textarea:focus,select:focus{border-color:var(--ink)}
+textarea{resize:vertical;font-family:ui-monospace,Menlo,monospace;font-size:13.5px;line-height:1.6}
+label{display:block;font-size:13px;font-weight:600;margin:14px 0 5px;color:var(--ink)}
+.row{display:flex;gap:12px;flex-wrap:wrap}.row>*{flex:1;min-width:140px}
+
+/* tabs */
+.tabs{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap}
+.tab{padding:8px 16px;border-radius:99px;border:1.5px solid var(--line);background:#fff;
+  font-size:13.5px;font-weight:600;cursor:pointer;color:var(--ink-soft)}
+.tab.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+/* traffic lights */
+.dot{width:12px;height:12px;border-radius:50%;display:inline-block;vertical-align:-1px}
+.d-green{background:var(--jade)} .d-yellow{background:var(--amber)}
+.d-red{background:var(--red)} .d-blue{background:var(--blue)} .d-gray{background:#B9BFC6}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:99px;
+  font-size:12px;font-weight:600}
+.p-green{background:var(--jade-soft);color:var(--jade)}
+.p-yellow{background:var(--amber-soft);color:#96650a}
+.p-red{background:var(--red-soft);color:var(--red)}
+.p-blue{background:var(--blue-soft);color:var(--blue)}
+.p-gray{background:#EEF0F2;color:var(--ink-soft)}
+
+/* tables */
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);
+  text-align:left;padding:8px 10px;border-bottom:2px solid var(--line)}
+td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:hover td{background:#FAFAF7}
+.bar{height:8px;background:#EEF0F2;border-radius:99px;overflow:hidden;min-width:80px}
+.bar>i{display:block;height:100%;background:var(--red);border-radius:99px}
+
+/* student test */
+.q-card{background:#fff;border:1px solid var(--line);border-radius:var(--r);
+  padding:18px 20px;margin-bottom:14px}
+.q-num{font-family:var(--serif);font-weight:900;color:var(--red);font-size:15px;margin-right:6px}
+.q-text{font-weight:600;font-size:15.5px;margin-bottom:12px}
+.opt{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1.5px solid var(--line);
+  border-radius:9px;margin-bottom:8px;cursor:pointer;transition:.12s}
+.opt:hover{border-color:var(--ink-soft)}
+.opt.sel{border-color:var(--ink);background:#F4F6F8;box-shadow:inset 3px 0 0 var(--ink)}
+.opt input{width:auto;margin-top:3px}
+.timerbar{position:sticky;top:0;z-index:50;background:var(--ink);color:#fff;border-radius:10px;
+  padding:12px 18px;display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.timerbar b{font-family:var(--serif);font-size:20px;letter-spacing:.05em}
+.timerbar.warn b{color:#FFC96B}.timerbar.crit b{color:#FF8A7A}
+.noselect{user-select:none;-webkit-user-select:none}
+
+/* result stamp */
+.stamp{width:120px;height:120px;border:5px solid var(--red);border-radius:14px;color:var(--red);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;margin:18px auto;
+  font-family:var(--serif);transform:rotate(-6deg);opacity:.92}
+.stamp b{font-size:40px;font-weight:900;line-height:1}
+.stamp span{font-size:12px;font-weight:700;letter-spacing:.1em}
+.stamp.pass{border-color:var(--jade);color:var(--jade)}
+
+.center{text-align:center}
+.big-time{font-family:var(--serif);font-size:42px;font-weight:900}
+.code{font-family:ui-monospace,monospace;background:#F0F1EC;border:1px solid var(--line);
+  border-radius:7px;padding:2px 7px;font-size:13px}
+.linkbox{display:flex;gap:8px;align-items:center}
+.linkbox input{font-family:ui-monospace,monospace;font-size:12.5px}
+.note{background:var(--amber-soft);border:1px solid #EBD9AE;border-radius:10px;
+  padding:12px 14px;font-size:13.5px;margin:12px 0}
+.note.red{background:var(--red-soft);border-color:#E8C4BE}
+.note.green{background:var(--jade-soft);border-color:#BFE0CF}
+.modal-bg{position:fixed;inset:0;background:rgba(33,42,51,.5);z-index:100;
+  display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:#fff;border-radius:14px;max-width:680px;width:100%;max-height:85vh;
+  overflow-y:auto;padding:24px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:640px){.grid2{grid-template-columns:1fr}.wrap{padding:16px 10px 60px}}
+.stat{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;text-align:center}
+.stat b{font-family:var(--serif);font-size:26px;display:block}
+.stat span{font-size:12px;color:var(--ink-soft);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px}
+footer{margin-top:40px;text-align:center;color:var(--ink-soft);font-size:12.5px}
+</style>
+</head>
+<body>
+
+<div class="wrap" id="app"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="config.js"></script>
+<script>
+/* ============================================================
+   ⚙️ SOZLAMALAR endi shu faylda emas — "config.js" faylida.
+   Bu yerga hech narsa yozmang; config.js ni tahrirlang.
+   (config.js topilmasa yoki bo'sh bo'lsa, quyida standart bo'sh qiymatlar ishlatiladi
+   va sayt "Firebase hali ulanmagan" ekranini ko'rsatadi.)
+   ============================================================ */
+const FIREBASE_CONFIG = window.FIREBASE_CONFIG || {};
+const SUPER_ADMIN_EMAILS = window.SUPER_ADMIN_EMAILS || [];
+
+const $ = s => document.querySelector(s);
+const app = $('#app');
+const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fbReady = FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.databaseURL;
+let db = null, auth = null, currentUser = null, testsListenerRef = null, authMode = 'login';
+if (fbReady){ firebase.initializeApp(FIREBASE_CONFIG); db = firebase.database(); auth = firebase.auth(); }
+
+
+const uid = n => Array.from({length:n},()=>'abcdefghjkmnpqrstuvwxyz23456789'[Math.floor(Math.random()*31)]).join('');
+const fmtT = s => { s=Math.max(0,Math.round(s)); return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); };
+
+/* ---------- TEST PARSER ----------
+   Format:
+   1. Savol matni?
+   Variant A
+   # To'g'ri variant
+   Variant C
+   ----
+*/
+function parseTest(text){
+  const blocks = text.split(/\n\s*-{3,}\s*\n?/).map(b=>b.trim()).filter(Boolean);
+  const questions = []; const errors = [];
+  blocks.forEach((b,i)=>{
+    const lines = b.split('\n').map(l=>l.trim()).filter(Boolean);
+    if(lines.length < 3){ errors.push(`${i+1}-blok: kamida 1 savol + 2 variant kerak`); return; }
+    const q = lines[0].replace(/^\d+[\.\)]\s*/,'');
+    const options = []; let correct = -1;
+    lines.slice(1).forEach(l=>{
+      if(l.startsWith('#')){ correct = options.length; options.push(l.replace(/^#\s*/,'')); }
+      else options.push(l);
+    });
+    if(correct === -1){ errors.push(`${i+1}-savol: to'g'ri javob (#) belgilanmagan`); return; }
+    questions.push({q, options, correct});
+  });
+  return {questions, errors};
+}
+
+function parseCriteria(text){
+  const rows = [];
+  text.split('\n').map(l=>l.trim()).filter(Boolean).forEach(l=>{
+    const m = l.match(/^(\d+)\s*=\s*(.+)$/);
+    if(m) rows.push({min:+m[1], label:m[2].trim()});
+  });
+  rows.sort((a,b)=>b.min-a.min);
+  return rows;
+}
+function gradeOf(percent, criteria){
+  for(const c of criteria) if(percent >= c.min) return c.label;
+  return criteria.length ? criteria[criteria.length-1].label : '—';
+}
+function shuffle(arr){ const a=[...arr]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+
+/* ================= ROUTING ================= */
+const params = new URLSearchParams(location.search);
+function loadingScreen(){ app.innerHTML = `<div class="narrow center" style="margin:60px auto"><p class="muted">Yuklanmoqda…</p></div>`; }
+function adminRoute(){
+  const u = auth.currentUser;
+  if(u){ currentUser = u; renderAdmin(); } else { authMode='login'; renderAuthGate(); }
+}
+window.addEventListener('load', ()=>{
+  if(!fbReady) return renderSetup();
+  if(params.get('t')) return studentEntry(params.get('t'));
+  if(location.hash === '#admin'){ loadingScreen(); return; }
+  renderLanding();
+});
+window.addEventListener('hashchange', ()=>{
+  if(!fbReady || params.get('t')) return;
+  if(location.hash === '#admin'){ loadingScreen(); adminRoute(); }
+  else renderLanding();
+});
+if (fbReady){
+  auth.onAuthStateChanged(u=>{
+    currentUser = u;
+    if(location.hash === '#admin' && !params.get('t')) adminRoute();
+  });
+}
+
+/* ================= SETUP SCREEN ================= */
+function renderSetup(){
+  app.innerHTML = `
+  <div class="narrow" style="margin:0 auto">
+    <div class="brand"><div class="seal">考</div><div><h1>Laoshi Test</h1><small>Sozlash kerak</small></div></div>
+    <div class="card">
+      <h2>⚙️ Firebase hali ulanmagan</h2>
+      <p class="muted" style="margin-bottom:10px">Sayt ishlashi uchun bepul Firebase bazasi kerak (5 daqiqa):</p>
+      <ol style="padding-left:20px;font-size:14px;display:grid;gap:8px">
+        <li><a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a> — yangi loyiha yarating</li>
+        <li><b>Build → Realtime Database → Create database</b> → "Start in test mode"</li>
+        <li><b>Project settings → General → Your apps → Web app (&lt;/&gt;)</b> — config obyektini oling</li>
+        <li><span class="code">config.example.js</span> nusxasini <span class="code">config.js</span> deb saqlab, qiymatlarni joylashtiring</li>
+        <li><b>Build → Authentication → Get started → Sign-in method → Email/Password</b> ni yoqing</li>
+        <li>GitHub'ga push qiling — tayyor! Har bir laoshi o'z email'i bilan ro'yxatdan o'tadi.</li>
+      </ol>
+    </div>
+  </div>`;
+}
+
+/* ================= LANDING ================= */
+function renderLanding(){
+  app.innerHTML = `
+  <div class="narrow" style="margin:0 auto">
+    <div class="brand"><div class="seal">考</div><div><h1>Laoshi Test</h1><small>Xitoy tili nazorat platformasi · 考试系统</small></div></div>
+    <div class="card center">
+      <h2>Siz kimsiz?</h2>
+      <div class="row" style="margin-top:14px">
+        <button class="btn-p" onclick="location.hash='#admin'">👩‍🏫 Men — Laoshi</button>
+        <button class="btn-ghost" onclick="alert('O\\'quvchilar testga laoshi bergan maxsus havola orqali kiradi. Havolani laoshidan so\\'rang.')">🎒 Men — O'quvchi</button>
+      </div>
+    </div>
+    <footer>老师测试 · GitHub Pages + Firebase</footer>
+  </div>`;
+}
+
+/* ================= ADMIN AUTH (har bir laoshi — alohida hisob) ================= */
+function renderAuthGate(){
+  app.innerHTML = `
+  <div class="narrow" style="margin:0 auto">
+    <div class="brand"><div class="seal">考</div><div><h1>Laoshi paneli</h1><small>Har bir o'qituvchi — alohida hisob</small></div></div>
+    <div class="tabs">
+      <div class="tab ${authMode==='login'?'on':''}" data-tab="login" onclick="authMode='login';renderAuthGate()">Kirish</div>
+      <div class="tab ${authMode==='register'?'on':''}" data-tab="register" onclick="authMode='register';renderAuthGate()">Ro'yxatdan o'tish</div>
+    </div>
+    <div class="card">
+      ${authMode==='register' ? `<label>Ismingiz</label><input id="a-name" placeholder="Masalan: Nilufar opa">` : ''}
+      <label>Email</label>
+      <input id="a-email" type="email" placeholder="siz@masalan.uz" autocomplete="username">
+      <label>Parol</label>
+      <input id="a-pass" type="password" placeholder="kamida 6 belgi" autocomplete="${authMode==='login'?'current-password':'new-password'}"
+        onkeydown="if(event.key==='Enter')${authMode==='login'?'doLogin()':'doRegister()'}">
+      <div id="a-err"></div>
+      <div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button class="btn-p" onclick="${authMode==='login'?'doLogin()':'doRegister()'}">${authMode==='login'?'Kirish':'Hisob yaratish'}</button>
+        ${authMode==='login' ? `<button class="btn-ghost btn-sm" onclick="doReset()">Parolni unutdingizmi?</button>` : ''}
+      </div>
+    </div>
+  </div>`;
+  $('#a-email').focus();
+}
+function authMsg(msg, type){
+  $('#a-err').innerHTML = msg ? `<div class="note ${type||'red'}">${esc(msg)}</div>` : '';
+}
+function friendlyAuthError(code){
+  const map = {
+    'auth/email-already-in-use': "Bu email allaqachon ro'yxatdan o'tgan — \"Kirish\" bo'limidan foydalaning.",
+    'auth/invalid-email': "Email noto'g'ri formatda.",
+    'auth/weak-password': "Parol juda oddiy, kamida 6 belgi bo'lsin.",
+    'auth/user-not-found': "Bunday email topilmadi.",
+    'auth/wrong-password': "Parol noto'g'ri.",
+    'auth/invalid-credential': "Email yoki parol noto'g'ri.",
+    'auth/too-many-requests': "Juda ko'p urinish bo'ldi. Birozdan keyin qayta urinib ko'ring."
+  };
+  return map[code] || ("Xatolik: " + code);
+}
+function doRegister(){
+  const name = $('#a-name').value.trim();
+  const email = $('#a-email').value.trim();
+  const pass = $('#a-pass').value;
+  if(name.length < 2) return authMsg("Ismingizni kiriting");
+  if(!email) return authMsg("Email kiriting");
+  if(pass.length < 6) return authMsg("Parol kamida 6 belgi bo'lsin");
+  authMsg('');
+  auth.createUserWithEmailAndPassword(email, pass).then(cred=>{
+    return cred.user.updateProfile({displayName:name}).then(()=>
+      db.ref('teachers/'+cred.user.uid).set({name, email, createdAt:Date.now()}));
+  }).catch(e=>authMsg(friendlyAuthError(e.code)));
+}
+function doLogin(){
+  const email = $('#a-email').value.trim();
+  const pass = $('#a-pass').value;
+  if(!email || !pass) return authMsg("Email va parolni kiriting");
+  authMsg('');
+  auth.signInWithEmailAndPassword(email, pass).catch(e=>authMsg(friendlyAuthError(e.code)));
+}
+function doReset(){
+  const email = $('#a-email').value.trim();
+  if(!email) return authMsg("Avval email kiriting, keyin qayta bosing");
+  auth.sendPasswordResetEmail(email)
+    .then(()=>authMsg("✅ Parolni tiklash havolasi emailingizga yuborildi", 'green'))
+    .catch(e=>authMsg(friendlyAuthError(e.code)));
+}
+function doLogout(){
+  if(testsListenerRef){ testsListenerRef.off(); testsListenerRef=null; }
+  if(sessListener) sessListener.off();
+  tests = {}; curTestId = null;
+  auth.signOut().then(()=>{ location.hash=''; renderLanding(); });
+}
+
+/* ================= ADMIN ================= */
+let adminTab = 'tests', tests = {}, sessListener = null, curTestId = null;
+
+function renderAdmin(){
+  const uid = currentUser.uid;
+  const name = currentUser.displayName || currentUser.email;
+  const isSuper = SUPER_ADMIN_EMAILS.includes(currentUser.email);
+  app.innerHTML = `
+  <div class="brand" style="justify-content:space-between">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="seal">考</div><div><h1>Laoshi paneli</h1><small>${esc(name)} · ${esc(currentUser.email)}</small></div>
+    </div>
+    <button class="btn-ghost btn-sm" onclick="doLogout()">Chiqish</button>
+  </div>
+  <div class="tabs">
+    <div class="tab ${adminTab==='tests'?'on':''}" data-tab="tests" onclick="setTab('tests')">📚 Testlarim</div>
+    <div class="tab ${adminTab==='create'?'on':''}" data-tab="create" onclick="setTab('create')">➕ Yangi test</div>
+    <div class="tab ${adminTab==='dash'?'on':''}" data-tab="dash" onclick="setTab('dash')">📊 Jonli natijalar</div>
+    ${isSuper ? `<div class="tab ${adminTab==='overview'?'on':''}" data-tab="overview" onclick="setTab('overview')">🏫 Maktab nazorati</div>` : ''}
+  </div>
+  <div id="tabBody"></div>`;
+  if(testsListenerRef) testsListenerRef.off();
+  testsListenerRef = db.ref('tests').orderByChild('ownerUid').equalTo(uid);
+  testsListenerRef.on('value', snap=>{ tests = snap.val()||{}; if(adminTab==='tests') renderTestList(); refreshDashSelect(); });
+  setTab(adminTab);
+}
+function setTab(t){
+  adminTab = t;
+  document.querySelectorAll('.tab').forEach(el=>el.classList.toggle('on', el.dataset.tab===t));
+  if(t==='tests') renderTestList();
+  if(t==='create') renderCreate();
+  if(t==='dash') renderDash();
+  if(t==='overview') renderOverview();
+}
+
+/* ---------- MAKTAB NAZORATI (super-admin, ixtiyoriy) ---------- */
+function renderOverview(){
+  $('#tabBody').innerHTML = `<div class="card"><h2>🏫 Barcha laoshilar</h2><div id="ov-body"><p class="muted">Yuklanmoqda…</p></div></div>`;
+  Promise.all([ db.ref('teachers').once('value'), db.ref('tests').once('value') ]).then(([tSnap, testSnap])=>{
+    const teachers = tSnap.val()||{};
+    const allTests = testSnap.val()||{};
+    const byOwner = {};
+    Object.values(allTests).forEach(t=>{
+      const o = t.ownerUid || '—';
+      byOwner[o] = byOwner[o] || {count:0, questions:0, name:t.ownerName||''};
+      byOwner[o].count++; byOwner[o].questions += (t.questions||[]).length;
+    });
+    const uids = new Set([...Object.keys(teachers), ...Object.keys(byOwner)]);
+    const rows = [...uids].map(uid=>{
+      const te = teachers[uid]||{}; const st = byOwner[uid]||{count:0,questions:0,name:''};
+      return {name: te.name || st.name || 'Noma\u2019lum', email: te.email || '—', count: st.count, questions: st.questions};
+    }).sort((a,b)=>b.count-a.count);
+    $('#ov-body').innerHTML = !rows.length ? `<p class="muted">Hali hech kim ro'yxatdan o'tmagan.</p>` :
+      `<table><tr><th>Laoshi</th><th>Email</th><th>Testlar</th><th>Savollar</th></tr>
+      ${rows.map(r=>`<tr><td style="font-weight:600">${esc(r.name)}</td><td>${esc(r.email)}</td><td>${r.count}</td><td>${r.questions}</td></tr>`).join('')}
+      </table>`;
+  });
+}
+
+function renderTestList(){
+  const ids = Object.keys(tests).sort((a,b)=>(tests[b].createdAt||0)-(tests[a].createdAt||0));
+  $('#tabBody').innerHTML = !ids.length
+    ? `<div class="card center"><p class="muted">Hozircha test yo'q. "➕ Yangi test" bo'limidan yarating.</p></div>`
+    : ids.map(id=>{
+      const t = tests[id];
+      const link = location.origin + location.pathname + '?t=' + id;
+      return `<div class="card">
+        <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;align-items:flex-start">
+          <div>
+            <h3>${esc(t.title)}</h3>
+            <p class="muted">${t.questions.length} savol · ${t.timeLimit} daqiqa · ${t.shuffleQ?'savollar aralash':'tartibli'} ${t.showMistakes?'· xatolar ko\u2018rsatiladi':''}</p>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn-jade btn-sm" onclick="curTestId='${id}';setTab('dash')">📊 Natijalar</button>
+            <button class="btn-ghost btn-sm" onclick="delTest('${id}')">🗑</button>
+          </div>
+        </div>
+        <label>O'quvchilar uchun doimiy havola</label>
+        <div class="linkbox">
+          <input readonly value="${link}" onclick="this.select()">
+          <button class="btn-p btn-sm" onclick="navigator.clipboard.writeText('${link}');this.textContent='✓'">Nusxa</button>
+          <button class="btn-ghost btn-sm" onclick="toggleQR(this,'${link}')">QR</button>
+        </div>
+        <div class="qr-slot center"></div>
+      </div>`;
+    }).join('');
+}
+function toggleQR(btn, link){
+  const slot = btn.closest('.card').querySelector('.qr-slot');
+  slot.innerHTML = slot.innerHTML ? '' :
+    `<img style="margin-top:12px;border:1px solid var(--line);border-radius:10px" width="180" height="180"
+      src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(link)}">`;
+}
+function delTest(id){
+  if(!confirm("Testni va barcha natijalarni o'chirishni tasdiqlaysizmi?")) return;
+  db.ref('tests/'+id).remove(); db.ref('sessions/'+id).remove();
+}
+
+function renderCreate(){
+  $('#tabBody').innerHTML = `
+  <div class="card">
+    <h2>Yangi test yaratish</h2>
+    <label>Test nomi</label>
+    <input id="c-title" placeholder="Masalan: HSK 2 · 5-dars grammatikasi">
+    <div class="row">
+      <div><label>Vaqt (daqiqa)</label><input id="c-time" type="number" value="20" min="1"></div>
+      <div><label>Savollar aralashsinmi?</label>
+        <select id="c-shq"><option value="1">Ha (har kimda har xil tartib)</option><option value="0">Yo'q</option></select></div>
+      <div><label>Variantlar aralashsinmi?</label>
+        <select id="c-sho"><option value="1">Ha</option><option value="0">Yo'q</option></select></div>
+      <div><label>O'quvchi xatosini ko'rsinmi?</label>
+        <select id="c-mis"><option value="0">Yo'q, faqat baho</option><option value="1">Ha, qaysi savolda xato qilganini</option></select></div>
+    </div>
+    <label>Savollar <span class="muted" style="font-weight:400">(har savol <b>----</b> bilan ajratiladi, to'g'ri javob oldiga <b>#</b>)</span></label>
+    <textarea id="c-body" rows="14" placeholder="1. «你好» so'zi nima degani?
+Rahmat
+# Salom
+Xayr
+Kechirasiz
+----
+2. «我是学生» gapida «学生» nima?
+Fe'l
+# Ot (talaba)
+Sifat
+----
+3. ..."></textarea>
+    <label>Baho mezoni <span class="muted" style="font-weight:400">(foiz = baho; laoshi o'zi belgilaydi)</span></label>
+    <textarea id="c-crit" rows="4">86 = 5 (A'lo)
+71 = 4 (Yaxshi)
+56 = 3 (Qoniqarli)
+0 = 2 (Qoniqarsiz)</textarea>
+    <div style="margin-top:16px;display:flex;gap:10px">
+      <button class="btn-ghost" onclick="previewTest()">👁 Tekshirish</button>
+      <button class="btn-red" onclick="saveTest()">💾 Saqlash va havola olish</button>
+    </div>
+    <div id="c-preview"></div>
+  </div>`;
+}
+function previewTest(){
+  const {questions, errors} = parseTest($('#c-body').value);
+  $('#c-preview').innerHTML =
+    (errors.length ? `<div class="note red"><b>Xatolar:</b><br>${errors.map(esc).join('<br>')}</div>` : '') +
+    (questions.length ? `<div class="note green"><b>${questions.length} savol topildi.</b></div>` +
+      questions.map((q,i)=>`<div class="q-card"><div class="q-text"><span class="q-num">${i+1}.</span>${esc(q.q)}</div>
+        ${q.options.map((o,j)=>`<div class="opt" style="cursor:default ${j===q.correct?';border-color:var(--jade);background:var(--jade-soft)':''}">${j===q.correct?'✅':'⚪'} ${esc(o)}</div>`).join('')}
+      </div>`).join('') : '');
+}
+function saveTest(){
+  const title = $('#c-title').value.trim();
+  const {questions, errors} = parseTest($('#c-body').value);
+  const criteria = parseCriteria($('#c-crit').value);
+  if(!title) return alert('Test nomini kiriting');
+  if(errors.length) return alert('Avval xatolarni tuzating:\n'+errors.join('\n'));
+  if(!questions.length) return alert('Savollar topilmadi');
+  if(!criteria.length) return alert('Baho mezonini kiriting');
+  const id = uid(6);
+  db.ref('tests/'+id).set({
+    title, questions, criteria,
+    timeLimit: Math.max(1, +$('#c-time').value||20),
+    shuffleQ: $('#c-shq').value==='1', shuffleO: $('#c-sho').value==='1',
+    showMistakes: $('#c-mis').value==='1',
+    ownerUid: currentUser.uid, ownerName: currentUser.displayName || currentUser.email,
+    createdAt: Date.now()
+  }).then(()=>{ curTestId = id; adminTab='tests'; setTab('tests');
+    alert('Test saqlandi! Havolani "Testlarim" bo\u2018limidan oling.'); });
+}
+
+/* ---------- LIVE DASHBOARD ---------- */
+function refreshDashSelect(){
+  const sel = $('#dash-sel'); if(!sel) return;
+  const ids = Object.keys(tests);
+  sel.innerHTML = ids.map(id=>`<option value="${id}" ${id===curTestId?'selected':''}>${esc(tests[id].title)}</option>`).join('');
+}
+function renderDash(){
+  const ids = Object.keys(tests);
+  if(!ids.length){ $('#tabBody').innerHTML = `<div class="card center"><p class="muted">Avval test yarating.</p></div>`; return; }
+  if(!curTestId || !tests[curTestId]) curTestId = ids[0];
+  $('#tabBody').innerHTML = `
+    <div class="card">
+      <div class="row" style="align-items:flex-end">
+        <div><label>Test tanlang</label>
+          <select id="dash-sel" onchange="curTestId=this.value;attachSessions()"></select></div>
+        <div style="flex:0"><button class="btn-ghost" onclick="exportCSV()">⬇ CSV</button></div>
+      </div>
+    </div>
+    <div id="dash-stats" class="stats"></div>
+    <div class="card"><h2>👥 O'quvchilar (jonli)</h2><div id="dash-table"></div></div>
+    <div class="card"><h2>🗺 Xato xaritasi <span class="muted" style="font-weight:400;font-family:var(--sans);font-size:13px">— guruh qaysi savolda ko'p xato qildi</span></h2><div id="dash-map"></div></div>
+    <div id="modal-slot"></div>`;
+  refreshDashSelect();
+  attachSessions();
+}
+let curSessions = {};
+function attachSessions(){
+  if(sessListener) sessListener.off();
+  sessListener = db.ref('sessions/'+curTestId);
+  sessListener.on('value', snap=>{ curSessions = snap.val()||{}; drawDash(); });
+}
+function statusInfo(s, t){
+  if(s.status==='locked')   return {pill:'p-red',  dot:'d-red',   txt:'🔒 Bloklangan'};
+  if(s.status==='approved') return {pill:'p-yellow',dot:'d-yellow',txt:'⏳ Ruxsat berildi'};
+  if(s.status==='finished'){
+    if(s.percent>=71) return {pill:'p-green', dot:'d-green', txt:'✅ Tugatdi'};
+    if(s.percent>=56) return {pill:'p-yellow',dot:'d-yellow',txt:'⚠️ Tugatdi'};
+    return {pill:'p-red', dot:'d-red', txt:'❌ Tugatdi'};
+  }
+  return {pill:'p-blue', dot:'d-blue', txt:'✍️ Yozmoqda'};
+}
+function drawDash(){
+  const t = tests[curTestId]; if(!t || !$('#dash-table')) return;
+  const rows = Object.entries(curSessions).sort((a,b)=>(a[1].name||'').localeCompare(b[1].name||''));
+  const total = t.questions.length;
+  const fin = rows.filter(([,s])=>s.status==='finished');
+  const avg = fin.length ? Math.round(fin.reduce((a,[,s])=>a+(s.percent||0),0)/fin.length) : 0;
+  $('#dash-stats').innerHTML = `
+    <div class="stat"><b>${rows.length}</b><span>Kirganlar</span></div>
+    <div class="stat"><b>${fin.length}</b><span>Tugatgan</span></div>
+    <div class="stat"><b style="color:${avg>=71?'var(--jade)':avg>=56?'var(--amber)':'var(--red)'}">${avg}%</b><span>O'rtacha</span></div>
+    <div class="stat"><b style="color:var(--red)">${rows.filter(([,s])=>s.status==='locked').length}</b><span>Bloklangan</span></div>`;
+
+  $('#dash-table').innerHTML = !rows.length
+    ? `<p class="muted">Hali hech kim kirmadi. Havolani o'quvchilarga yuboring.</p>`
+    : `<div style="overflow-x:auto"><table>
+    <tr><th></th><th>Ism</th><th>Holat</th><th>Javoblar</th><th>Natija</th><th>Chiqishlar</th><th>Amal</th></tr>
+    ${rows.map(([sid,s])=>{
+      const si = statusInfo(s,t);
+      const answered = Object.keys(s.answers||{}).length;
+      return `<tr>
+        <td><span class="dot ${si.dot}"></span></td>
+        <td style="font-weight:600;cursor:pointer" onclick="showDetail('${sid}')">${esc(s.name)}</td>
+        <td><span class="pill ${si.pill}">${si.txt}</span></td>
+        <td>${answered}/${total}</td>
+        <td>${s.status==='finished' ? `<b>${s.correct}/${total}</b> · ${s.percent}% · <b>${esc(s.grade)}</b>${s.timeout?' <span class="muted">(vaqt tugadi)</span>':''}` : '—'}</td>
+        <td>${s.violations ? `<span class="pill p-red">${s.violations}×</span>` : '0'}</td>
+        <td style="white-space:nowrap">
+          ${s.status==='locked' ? `<button class="btn-jade btn-sm" onclick="approve('${sid}')">✓ Ruxsat</button>` : ''}
+          <button class="btn-ghost btn-sm" onclick="resetStudent('${sid}')">↺</button>
+          <button class="btn-ghost btn-sm" onclick="if(confirm('O\u2018chirilsinmi?'))db.ref('sessions/${curTestId}/${sid}').remove()">🗑</button>
+        </td></tr>`;
+    }).join('')}</table></div>`;
+
+  // error map
+  const wrong = t.questions.map(()=>0); let counted = 0;
+  rows.forEach(([,s])=>{
+    if(s.status!=='finished') return; counted++;
+    t.questions.forEach((q,i)=>{ if((s.answers||{})[i] !== q.correct) wrong[i]++; });
+  });
+  $('#dash-map').innerHTML = !counted
+    ? `<p class="muted">Kamida bitta o'quvchi tugatgach ko'rinadi.</p>`
+    : `<table><tr><th>#</th><th>Savol</th><th>Xato qilganlar</th><th></th></tr>` +
+      t.questions.map((q,i)=>{
+        const pc = Math.round(wrong[i]/counted*100);
+        return `<tr><td class="q-num">${i+1}</td><td>${esc(q.q)}</td>
+          <td style="white-space:nowrap">${wrong[i]}/${counted} (${pc}%)</td>
+          <td><div class="bar"><i style="width:${pc}%;background:${pc>=50?'var(--red)':pc>=25?'var(--amber)':'var(--jade)'}"></i></div></td></tr>`;
+      }).join('') + `</table>`;
+}
+function approve(sid){ db.ref(`sessions/${curTestId}/${sid}`).update({status:'approved'}); }
+function resetStudent(sid){
+  if(!confirm("O'quvchi testni boshidan boshlaydi. Davom etilsinmi?")) return;
+  db.ref(`sessions/${curTestId}/${sid}`).update({status:'reset', answers:null, violations:0, correct:null, percent:null, grade:null, timeout:null});
+}
+function showDetail(sid){
+  const t = tests[curTestId], s = curSessions[sid]; if(!t||!s) return;
+  $('#modal-slot').innerHTML = `<div class="modal-bg" onclick="if(event.target===this)this.remove()">
+    <div class="modal"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <h2 style="margin:0">${esc(s.name)} — batafsil</h2>
+      <button class="btn-ghost btn-sm" onclick="document.querySelector('.modal-bg').remove()">✕</button></div>
+    ${t.questions.map((q,i)=>{
+      const a = (s.answers||{})[i];
+      const ok = a === q.correct;
+      return `<div class="q-card" style="border-left:4px solid ${a==null?'#B9BFC6':ok?'var(--jade)':'var(--red)'}">
+        <div class="q-text"><span class="q-num">${i+1}.</span>${esc(q.q)}</div>
+        <div class="muted">Javobi: <b style="color:${a==null?'inherit':ok?'var(--jade)':'var(--red)'}">${a==null?'javob bermagan':esc(q.options[a])}</b>
+        ${!ok?`<br>To'g'risi: <b style="color:var(--jade)">${esc(q.options[q.correct])}</b>`:''}</div></div>`;
+    }).join('')}</div></div>`;
+}
+function exportCSV(){
+  const t = tests[curTestId]; if(!t) return;
+  let csv = 'Ism,Holat,Togri,Jami,Foiz,Baho,Chiqishlar\n';
+  Object.values(curSessions).forEach(s=>{
+    csv += [s.name, s.status, s.correct??'', t.questions.length, s.percent??'', (s.grade||'').replace(/,/g,';'), s.violations||0].join(',')+'\n';
+  });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv'}));
+  a.download = t.title.replace(/[^\w\d]+/g,'_')+'_natijalar.csv'; a.click();
+}
+
+/* ================= STUDENT ================= */
+let ST = null; // {testId, sid, test, order, deadline, timerInt, sessRef}
+
+function studentEntry(testId){
+  db.ref('tests/'+testId).once('value').then(snap=>{
+    const test = snap.val();
+    if(!test){ app.innerHTML = `<div class="card center narrow" style="margin:40px auto"><h2>Test topilmadi</h2><p class="muted">Havolani laoshidan qayta so'rang.</p></div>`; return; }
+    const sid = localStorage.getItem('lt_sid_'+testId);
+    if(sid){
+      db.ref(`sessions/${testId}/${sid}`).once('value').then(s=>{
+        const sess = s.val();
+        if(!sess){ localStorage.removeItem('lt_sid_'+testId); return renderJoin(testId,test); }
+        resumeStudent(testId, sid, test, sess);
+      });
+    } else renderJoin(testId, test);
+  });
+}
+function renderJoin(testId, test){
+  app.innerHTML = `
+  <div class="narrow" style="margin:0 auto">
+    <div class="brand"><div class="seal">考</div><div><h1>${esc(test.title)}</h1><small>${test.questions.length} savol · ${test.timeLimit} daqiqa</small></div></div>
+    <div class="card">
+      <div class="note red"><b>⚠️ Muhim qoidalar:</b><br>
+      • Test boshlangach vaqt to'xtamaydi.<br>
+      • Boshqa oynaga/ilovaga o'tsangiz yoki brauzerdan chiqsangiz — test <b>darhol bloklanadi</b> va faqat laoshi ruxsati bilan davom etasiz.<br>
+      • Vaqt tugasa javoblaringiz avtomatik topshiriladi.</div>
+      <label>Ism va familiyangiz</label>
+      <input id="s-name" placeholder="Masalan: Aziza Karimova" onkeydown="if(event.key==='Enter')startStudent('${testId}')">
+      <div style="margin-top:16px"><button class="btn-red" style="width:100%" onclick="startStudent('${testId}')">▶️ Testni boshlash</button></div>
+    </div>
+  </div>`;
+  $('#s-name').focus();
+  ST = {testId, test};
+}
+function startStudent(testId){
+  const name = $('#s-name').value.trim();
+  if(name.length < 3) return alert('Ism-familiyangizni to\u2018liq kiriting');
+  const sid = uid(8);
+  localStorage.setItem('lt_sid_'+testId, sid);
+  const t = ST.test;
+  const order = t.shuffleQ ? shuffle(t.questions.map((_,i)=>i)) : t.questions.map((_,i)=>i);
+  const optOrders = t.questions.map(q => t.shuffleO ? shuffle(q.options.map((_,j)=>j)) : q.options.map((_,j)=>j));
+  const deadline = Date.now() + t.timeLimit*60000;
+  db.ref(`sessions/${testId}/${sid}`).set({
+    name, status:'active', startedAt:Date.now(), deadline, violations:0,
+    order, optOrders
+  }).then(()=> runTest(testId, sid, t, {name, order, optOrders, deadline, answers:{}}));
+}
+function resumeStudent(testId, sid, test, sess){
+  if(sess.status === 'finished') return renderResult(test, sess);
+  if(sess.status === 'locked')   return renderLocked(testId, sid, test);
+  if(sess.status === 'reset'){
+    localStorage.removeItem('lt_sid_'+testId);
+    return renderJoin(testId, test), ST={testId, test};
+  }
+  if(sess.status === 'approved'){
+    // continue: new deadline from remaining
+    const deadline = Date.now() + (sess.remainingSec||60)*1000;
+    db.ref(`sessions/${testId}/${sid}`).update({status:'active', deadline});
+    sess.deadline = deadline; sess.status='active';
+  }
+  runTest(testId, sid, test, sess);
+}
+
+function runTest(testId, sid, test, sess){
+  ST = {testId, sid, test, deadline: sess.deadline,
+        order: sess.order || test.questions.map((_,i)=>i),
+        optOrders: sess.optOrders || test.questions.map(q=>q.options.map((_,j)=>j)),
+        answers: sess.answers || {}, active:true};
+  ST.sessRef = db.ref(`sessions/${testId}/${sid}`);
+
+  // watch for teacher reset while writing
+  ST.sessRef.child('status').on('value', s=>{
+    const st = s.val();
+    if(st==='reset'){ location.reload(); }
+    if(st==='locked' && ST.active){ ST.active=false; renderLocked(testId,sid,test); }
+  });
+
+  app.innerHTML = `
+  <div class="narrow noselect" style="margin:0 auto" oncontextmenu="return false">
+    <div class="timerbar" id="tbar">
+      <div><b style="font-size:14px;letter-spacing:0">${esc(sess.name||'')}</b><br><span style="font-size:12px;opacity:.75">${esc(test.title)}</span></div>
+      <b id="tleft">--:--</b>
+    </div>
+    <div id="qs"></div>
+    <div class="card center">
+      <p class="muted" id="progress-note"></p>
+      <button class="btn-red" style="width:100%;margin-top:8px" onclick="submitTest(false)">📤 Testni topshirish</button>
+    </div>
+  </div>`;
+
+  $('#qs').innerHTML = ST.order.map((qi, pos)=>{
+    const q = test.questions[qi];
+    return `<div class="q-card">
+      <div class="q-text"><span class="q-num">${pos+1}.</span>${esc(q.q)}</div>
+      ${ST.optOrders[qi].map(oj=>`
+        <label class="opt ${ST.answers[qi]===oj?'sel':''}" data-q="${qi}" data-o="${oj}">
+          <input type="radio" name="q${qi}" ${ST.answers[qi]===oj?'checked':''} onchange="pick(${qi},${oj},this)">
+          <span>${esc(q.options[oj])}</span>
+        </label>`).join('')}
+    </div>`;
+  }).join('');
+  updProgress();
+
+  // timer
+  ST.timerInt = setInterval(()=>{
+    const left = (ST.deadline - Date.now())/1000;
+    const el = $('#tleft'); if(!el){ clearInterval(ST.timerInt); return; }
+    el.textContent = fmtT(left);
+    $('#tbar').classList.toggle('warn', left<120 && left>=30);
+    $('#tbar').classList.toggle('crit', left<30);
+    if(left <= 0){ clearInterval(ST.timerInt); submitTest(true); }
+  }, 500);
+
+  // anti-cheat
+  ST.onHide = ()=>{ if(document.hidden) lockNow('Sahifadan chiqib ketdi'); };
+  ST.onBlur = ()=> lockNow('Boshqa oynaga o\u2018tdi');
+  document.addEventListener('visibilitychange', ST.onHide);
+  window.addEventListener('blur', ST.onBlur);
+}
+function pick(qi, oj, input){
+  ST.answers[qi] = oj;
+  document.querySelectorAll(`.opt[data-q="${qi}"]`).forEach(el=>el.classList.toggle('sel', +el.dataset.o===oj));
+  ST.sessRef.child('answers/'+qi).set(oj);
+  updProgress();
+}
+function updProgress(){
+  const n = Object.keys(ST.answers).length, t = ST.test.questions.length;
+  const el = $('#progress-note'); if(el) el.textContent = `${n}/${t} savolga javob berildi`;
+}
+function detachStudent(){
+  if(!ST) return;
+  ST.active = false;
+  clearInterval(ST.timerInt);
+  document.removeEventListener('visibilitychange', ST.onHide||(()=>{}));
+  window.removeEventListener('blur', ST.onBlur||(()=>{}));
+  if(ST.sessRef) ST.sessRef.child('status').off();
+}
+function lockNow(reason){
+  if(!ST || !ST.active) return;
+  const remainingSec = Math.max(0, Math.round((ST.deadline - Date.now())/1000));
+  ST.sessRef.update({status:'locked', remainingSec,
+    violations: firebase.database.ServerValue.increment(1), lockReason: reason});
+  detachStudent();
+  renderLocked(ST.testId, ST.sid, ST.test);
+}
+function renderLocked(testId, sid, test){
+  detachStudent();
+  app.innerHTML = `
+  <div class="narrow" style="margin:0 auto">
+    <div class="card center" style="margin-top:40px">
+      <div style="font-size:52px">🔒</div>
+      <h2>Test bloklandi</h2>
+      <p class="muted">Siz test oynasidan chiqib ketdingiz. Qoidaga ko'ra test to'xtatildi.<br>
+      Davom etish uchun <b>laoshi ruxsatini kuting</b> — ruxsat berilishi bilan bu sahifa o'zi yangilanadi.</p>
+      <p class="muted" style="margin-top:10px">Sahifani yopmang.</p>
+    </div>
+  </div>`;
+  db.ref(`sessions/${testId}/${sid}/status`).on('value', s=>{
+    const st = s.val();
+    if(st==='approved' || st==='reset'){ db.ref(`sessions/${testId}/${sid}/status`).off(); location.reload(); }
+  });
+}
+function submitTest(timeout){
+  if(!ST || !ST.active) return;
+  if(!timeout){
+    const n = Object.keys(ST.answers).length, t = ST.test.questions.length;
+    if(n < t && !confirm(`Siz ${t-n} ta savolga javob bermadingiz. Baribir topshirasizmi?`)) return;
+  }
+  const test = ST.test;
+  let correct = 0;
+  test.questions.forEach((q,i)=>{ if(ST.answers[i]===q.correct) correct++; });
+  const percent = Math.round(correct/test.questions.length*100);
+  const grade = gradeOf(percent, test.criteria);
+  const result = {status:'finished', correct, percent, grade, timeout:!!timeout, finishedAt:Date.now()};
+  ST.sessRef.update(result);
+  detachStudent();
+  renderResult(test, {...result, answers:ST.answers, name:''});
+}
+function renderResult(test, sess){
+  const pass = sess.percent >= (test.criteria.find(c=>c.min>0)?.min ?? 56);
+  app.innerHTML = `
+  <div class="narrow" style="margin:0 auto">
+    <div class="card center" style="margin-top:30px">
+      <h2>Test yakunlandi ${sess.timeout?'⏰ (vaqt tugadi)':''}</h2>
+      <div class="stamp ${sess.percent>=71?'pass':''}"><b>${sess.percent}%</b><span>${sess.correct}/${test.questions.length}</span></div>
+      <h1 style="font-size:22px">Baho: ${esc(sess.grade)}</h1>
+      <p class="muted" style="margin-top:8px">Natijangiz laoshiga yuborildi.</p>
+    </div>
+    ${test.showMistakes && sess.answers ? `<div class="card"><h2>Sizning javoblaringiz</h2>` +
+      test.questions.map((q,i)=>{
+        const a = (sess.answers||{})[i]; const ok = a===q.correct;
+        return `<div class="q-card" style="border-left:4px solid ${a==null?'#B9BFC6':ok?'var(--jade)':'var(--red)'}">
+          <div class="q-text"><span class="q-num">${i+1}.</span>${esc(q.q)}</div>
+          <div class="muted">Sizniki: <b style="color:${a==null?'inherit':ok?'var(--jade)':'var(--red)'}">${a==null?'—':esc(q.options[a])}</b>
+          ${!ok?`<br>To'g'risi: <b style="color:var(--jade)">${esc(q.options[q.correct])}</b>`:''}</div></div>`;
+      }).join('') + `</div>` : ''}
+  </div>`;
+}
+</script>
+</body>
+</html>
