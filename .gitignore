@@ -1,0 +1,5 @@
+# Haqiqiy Firebase qiymatlaringiz shu faylda — odatda repoga qo'shilmaydi.
+# ("Oddiy usul"dan foydalanayotgan bo'lsangiz va config.js'ni baribir
+#  repoga qo'shib qo'ymoqchi bo'lsangiz, shu qatorni o'chirib tashlang
+#  yoki `git add -f config.js` buyrug'idan foydalaning.)
+config.js
