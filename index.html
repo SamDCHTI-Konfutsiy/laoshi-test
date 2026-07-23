@@ -140,14 +140,20 @@ footer{margin-top:40px;text-align:center;color:var(--ink-soft);font-size:12.5px}
    va sayt "Firebase hali ulanmagan" ekranini ko'rsatadi.)
    ============================================================ */
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || {};
-const SUPER_ADMIN_EMAILS = window.SUPER_ADMIN_EMAILS || [];
 
 const $ = s => document.querySelector(s);
 const app = $('#app');
 const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fbReady = FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.databaseURL;
-let db = null, auth = null, currentUser = null, testsListenerRef = null, authMode = 'login';
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+let db = null, auth = null, currentUser = null, currentProfile = null, testsListenerRef = null, authMode = 'login', authBusy = false;
 if (fbReady){ firebase.initializeApp(FIREBASE_CONFIG); db = firebase.database(); auth = firebase.auth(); }
+// Admin yangi laoshi hisobi yaratganda o'z sessiyasidan chiqib ketmasligi uchun ikkinchi, mustaqil Firebase App:
+function getSecondaryAuth(){
+  let sApp = firebase.apps.find(a=>a.name==='secondary');
+  if(!sApp) sApp = firebase.initializeApp(FIREBASE_CONFIG, 'secondary');
+  return sApp.auth();
+}
 
 
 const uid = n => Array.from({length:n},()=>'abcdefghjkmnpqrstuvwxyz23456789'[Math.floor(Math.random()*31)]).join('');
@@ -170,8 +176,11 @@ function parseTest(text){
     const q = lines[0].replace(/^\d+[\.\)]\s*/,'');
     const options = []; let correct = -1;
     lines.slice(1).forEach(l=>{
-      if(l.startsWith('#')){ correct = options.length; options.push(l.replace(/^#\s*/,'')); }
-      else options.push(l);
+      let raw = l, isCorrect = false;
+      if(raw.startsWith('#')){ isCorrect = true; raw = raw.replace(/^#\s*/,''); }
+      raw = raw.replace(/^[A-Za-zА-Яа-я][\.\):]\s+/,''); // ixtiyoriy "A. " kabi harf-belgini olib tashlaydi
+      if(isCorrect) correct = options.length;
+      options.push(raw);
     });
     if(correct === -1){ errors.push(`${i+1}-savol: to'g'ri javob (#) belgilanmagan`); return; }
     questions.push({q, options, correct});
@@ -199,7 +208,34 @@ const params = new URLSearchParams(location.search);
 function loadingScreen(){ app.innerHTML = `<div class="narrow center" style="margin:60px auto"><p class="muted">Yuklanmoqda…</p></div>`; }
 function adminRoute(){
   const u = auth.currentUser;
-  if(u){ currentUser = u; renderAdmin(); } else { authMode='login'; renderAuthGate(); }
+  if(u){
+    currentUser = u;
+    db.ref('teachers/'+u.uid).once('value').then(snap=>{
+      currentProfile = snap.val();
+      if(!currentProfile){ auth.signOut().then(()=>{ authMode='login'; renderAuthGate(); }); return; }
+      if(currentProfile.active === false){
+        auth.signOut().then(renderRestricted);
+        return;
+      }
+      renderAdmin();
+    });
+  } else {
+    db.ref('teachers').once('value').then(snap=>{
+      if(!snap.exists()) renderBootstrap();
+      else { authMode='login'; renderAuthGate(); }
+    });
+  }
+}
+function renderRestricted(){
+  app.innerHTML = `
+  <div class="narrow" style="margin:0 auto">
+    <div class="card center" style="margin-top:40px">
+      <div style="font-size:44px">🚫</div>
+      <h2>Hisobingiz cheklangan</h2>
+      <p class="muted">Administrator hisobingizga vaqtincha kirishni cheklagan. Savollar bo'lsa,
+      administrator bilan bog'laning.</p>
+    </div>
+  </div>`;
 }
 window.addEventListener('load', ()=>{
   if(!fbReady) return renderSetup();
@@ -215,6 +251,7 @@ window.addEventListener('hashchange', ()=>{
 if (fbReady){
   auth.onAuthStateChanged(u=>{
     currentUser = u;
+    if(authBusy) return;
     if(location.hash === '#admin' && !params.get('t')) adminRoute();
   });
 }
@@ -233,7 +270,7 @@ function renderSetup(){
         <li><b>Project settings → General → Your apps → Web app (&lt;/&gt;)</b> — config obyektini oling</li>
         <li><span class="code">config.example.js</span> nusxasini <span class="code">config.js</span> deb saqlab, qiymatlarni joylashtiring</li>
         <li><b>Build → Authentication → Get started → Sign-in method → Email/Password</b> ni yoqing</li>
-        <li>GitHub'ga push qiling — tayyor! Har bir laoshi o'z email'i bilan ro'yxatdan o'tadi.</li>
+        <li>GitHub'ga push qiling — tayyor! Birinchi ochganingizda administrator hisobini yaratasiz.</li>
       </ol>
     </div>
   </div>`;
@@ -255,27 +292,57 @@ function renderLanding(){
   </div>`;
 }
 
-/* ================= ADMIN AUTH (har bir laoshi — alohida hisob) ================= */
-function renderAuthGate(){
+/* ================= ADMIN AUTH ================= */
+function renderBootstrap(){
   app.innerHTML = `
   <div class="narrow" style="margin:0 auto">
-    <div class="brand"><div class="seal">考</div><div><h1>Laoshi paneli</h1><small>Har bir o'qituvchi — alohida hisob</small></div></div>
-    <div class="tabs">
-      <div class="tab ${authMode==='login'?'on':''}" data-tab="login" onclick="authMode='login';renderAuthGate()">Kirish</div>
-      <div class="tab ${authMode==='register'?'on':''}" data-tab="register" onclick="authMode='register';renderAuthGate()">Ro'yxatdan o'tish</div>
-    </div>
+    <div class="brand"><div class="seal">考</div><div><h1>Birinchi ishga tushirish</h1><small>Administrator hisobini yarating</small></div></div>
     <div class="card">
-      ${authMode==='register' ? `<label>Ismingiz</label><input id="a-name" placeholder="Masalan: Nilufar opa">` : ''}
+      <p class="muted" style="margin-bottom:10px">Tizimda hali hech kim yo'q. Hozir yaratadigan hisobingiz
+      avtomatik <b>administrator</b> bo'ladi — u boshqa laoshilarga hisob ochib, ularni boshqaradi.</p>
+      <label>Ismingiz</label>
+      <input id="a-name" placeholder="Masalan: Nilufar opa">
       <label>Email</label>
       <input id="a-email" type="email" placeholder="siz@masalan.uz" autocomplete="username">
       <label>Parol</label>
-      <input id="a-pass" type="password" placeholder="kamida 6 belgi" autocomplete="${authMode==='login'?'current-password':'new-password'}"
-        onkeydown="if(event.key==='Enter')${authMode==='login'?'doLogin()':'doRegister()'}">
+      <input id="a-pass" type="password" placeholder="kamida 6 belgi" autocomplete="new-password" onkeydown="if(event.key==='Enter')doBootstrap()">
+      <div id="a-err"></div>
+      <div style="margin-top:14px"><button class="btn-p" onclick="doBootstrap()">Administrator hisobini yaratish</button></div>
+    </div>
+  </div>`;
+  $('#a-email').focus();
+}
+function doBootstrap(){
+  const name = $('#a-name').value.trim();
+  const email = $('#a-email').value.trim();
+  const pass = $('#a-pass').value;
+  if(name.length < 2) return authMsg("Ismingizni kiriting");
+  if(!email) return authMsg("Email kiriting");
+  if(pass.length < 6) return authMsg("Parol kamida 6 belgi bo'lsin");
+  authMsg('');
+  authBusy = true;
+  auth.createUserWithEmailAndPassword(email, pass).then(cred=>{
+    return cred.user.updateProfile({displayName:name}).then(()=>
+      db.ref('teachers/'+cred.user.uid).set({name, email, role:'admin', active:true, createdAt:Date.now()}));
+  }).then(()=>{
+    authBusy = false; currentUser = auth.currentUser; adminRoute();
+  }).catch(e=>{ authBusy = false; authMsg(friendlyAuthError(e.code)); });
+}
+function renderAuthGate(){
+  app.innerHTML = `
+  <div class="narrow" style="margin:0 auto">
+    <div class="brand"><div class="seal">考</div><div><h1>Laoshi paneli</h1><small>Hisobingizga kiring</small></div></div>
+    <div class="card">
+      <label>Email</label>
+      <input id="a-email" type="email" placeholder="siz@masalan.uz" autocomplete="username">
+      <label>Parol</label>
+      <input id="a-pass" type="password" placeholder="parolingiz" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
       <div id="a-err"></div>
       <div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <button class="btn-p" onclick="${authMode==='login'?'doLogin()':'doRegister()'}">${authMode==='login'?'Kirish':'Hisob yaratish'}</button>
-        ${authMode==='login' ? `<button class="btn-ghost btn-sm" onclick="doReset()">Parolni unutdingizmi?</button>` : ''}
+        <button class="btn-p" onclick="doLogin()">Kirish</button>
+        <button class="btn-ghost btn-sm" onclick="doReset()">Parolni unutdingizmi?</button>
       </div>
+      <p class="muted" style="margin-top:14px">Hisobingiz yo'qmi? Administratordan hisob ochib berishini so'rang.</p>
     </div>
   </div>`;
   $('#a-email').focus();
@@ -285,7 +352,7 @@ function authMsg(msg, type){
 }
 function friendlyAuthError(code){
   const map = {
-    'auth/email-already-in-use': "Bu email allaqachon ro'yxatdan o'tgan — \"Kirish\" bo'limidan foydalaning.",
+    'auth/email-already-in-use': "Bu email allaqachon ro'yxatdan o'tgan.",
     'auth/invalid-email': "Email noto'g'ri formatda.",
     'auth/weak-password': "Parol juda oddiy, kamida 6 belgi bo'lsin.",
     'auth/user-not-found': "Bunday email topilmadi.",
@@ -294,19 +361,6 @@ function friendlyAuthError(code){
     'auth/too-many-requests': "Juda ko'p urinish bo'ldi. Birozdan keyin qayta urinib ko'ring."
   };
   return map[code] || ("Xatolik: " + code);
-}
-function doRegister(){
-  const name = $('#a-name').value.trim();
-  const email = $('#a-email').value.trim();
-  const pass = $('#a-pass').value;
-  if(name.length < 2) return authMsg("Ismingizni kiriting");
-  if(!email) return authMsg("Email kiriting");
-  if(pass.length < 6) return authMsg("Parol kamida 6 belgi bo'lsin");
-  authMsg('');
-  auth.createUserWithEmailAndPassword(email, pass).then(cred=>{
-    return cred.user.updateProfile({displayName:name}).then(()=>
-      db.ref('teachers/'+cred.user.uid).set({name, email, createdAt:Date.now()}));
-  }).catch(e=>authMsg(friendlyAuthError(e.code)));
 }
 function doLogin(){
   const email = $('#a-email').value.trim();
@@ -325,7 +379,7 @@ function doReset(){
 function doLogout(){
   if(testsListenerRef){ testsListenerRef.off(); testsListenerRef=null; }
   if(sessListener) sessListener.off();
-  tests = {}; curTestId = null;
+  tests = {}; curTestId = null; currentProfile = null;
   auth.signOut().then(()=>{ location.hash=''; renderLanding(); });
 }
 
@@ -334,12 +388,13 @@ let adminTab = 'tests', tests = {}, sessListener = null, curTestId = null;
 
 function renderAdmin(){
   const uid = currentUser.uid;
-  const name = currentUser.displayName || currentUser.email;
-  const isSuper = SUPER_ADMIN_EMAILS.includes(currentUser.email);
+  const name = currentProfile.name || currentUser.email;
+  const isAdmin = currentProfile.role === 'admin';
   app.innerHTML = `
   <div class="brand" style="justify-content:space-between">
     <div style="display:flex;align-items:center;gap:12px">
-      <div class="seal">考</div><div><h1>Laoshi paneli</h1><small>${esc(name)} · ${esc(currentUser.email)}</small></div>
+      <div class="seal">考</div><div><h1>Laoshi paneli</h1>
+      <small>${esc(name)} · ${esc(currentUser.email)} ${isAdmin?'<span class="pill p-blue" style="margin-left:6px">Administrator</span>':''}</small></div>
     </div>
     <button class="btn-ghost btn-sm" onclick="doLogout()">Chiqish</button>
   </div>
@@ -347,7 +402,7 @@ function renderAdmin(){
     <div class="tab ${adminTab==='tests'?'on':''}" data-tab="tests" onclick="setTab('tests')">📚 Testlarim</div>
     <div class="tab ${adminTab==='create'?'on':''}" data-tab="create" onclick="setTab('create')">➕ Yangi test</div>
     <div class="tab ${adminTab==='dash'?'on':''}" data-tab="dash" onclick="setTab('dash')">📊 Jonli natijalar</div>
-    ${isSuper ? `<div class="tab ${adminTab==='overview'?'on':''}" data-tab="overview" onclick="setTab('overview')">🏫 Maktab nazorati</div>` : ''}
+    ${isAdmin ? `<div class="tab ${adminTab==='teachers'?'on':''}" data-tab="teachers" onclick="setTab('teachers')">👥 Laoshilar</div>` : ''}
   </div>
   <div id="tabBody"></div>`;
   if(testsListenerRef) testsListenerRef.off();
@@ -356,36 +411,81 @@ function renderAdmin(){
   setTab(adminTab);
 }
 function setTab(t){
+  if(t==='teachers' && currentProfile.role!=='admin') t = 'tests';
   adminTab = t;
   document.querySelectorAll('.tab').forEach(el=>el.classList.toggle('on', el.dataset.tab===t));
   if(t==='tests') renderTestList();
   if(t==='create') renderCreate();
   if(t==='dash') renderDash();
-  if(t==='overview') renderOverview();
+  if(t==='teachers') renderTeachers();
 }
 
-/* ---------- MAKTAB NAZORATI (super-admin, ixtiyoriy) ---------- */
-function renderOverview(){
-  $('#tabBody').innerHTML = `<div class="card"><h2>🏫 Barcha laoshilar</h2><div id="ov-body"><p class="muted">Yuklanmoqda…</p></div></div>`;
+/* ---------- LAOSHILAR (faqat administrator) ---------- */
+function genPass(){
+  const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  return Array.from({length:8},()=>chars[Math.floor(Math.random()*chars.length)]).join('');
+}
+function ntMsg(msg, type){
+  const el = $('#nt-err'); if(el) el.innerHTML = msg ? `<div class="note ${type||'red'}">${esc(msg)}</div>` : '';
+}
+function renderTeachers(){
+  $('#tabBody').innerHTML = `
+    <div class="card">
+      <h2>➕ Yangi laoshi qo'shish</h2>
+      <div class="row">
+        <div><label>Ism</label><input id="nt-name" placeholder="Masalan: Malika opa"></div>
+        <div><label>Email</label><input id="nt-email" type="email" placeholder="malika@masalan.uz"></div>
+        <div><label>Vaqtinchalik parol</label><input id="nt-pass" value="${genPass()}"></div>
+      </div>
+      <div id="nt-err"></div>
+      <div style="margin-top:12px"><button class="btn-red" onclick="adminCreateTeacher()">Hisob yaratish</button></div>
+      <p class="muted" style="margin-top:10px">Yaratilgach, shu email va parolni laoshiga bering. U keyinchalik
+      "Parolni unutdingizmi?" orqali o'z parolini o'zgartirishi mumkin.</p>
+    </div>
+    <div class="card"><h2>👥 Barcha laoshilar</h2><div id="t-list"><p class="muted">Yuklanmoqda…</p></div></div>`;
+  loadTeachersList();
+}
+function adminCreateTeacher(){
+  const name = $('#nt-name').value.trim();
+  const email = $('#nt-email').value.trim();
+  const pass = $('#nt-pass').value;
+  if(name.length < 2) return ntMsg("Ism kiriting");
+  if(!email) return ntMsg("Email kiriting");
+  if(pass.length < 6) return ntMsg("Parol kamida 6 belgi bo'lsin");
+  ntMsg('');
+  const sAuth = getSecondaryAuth();
+  sAuth.createUserWithEmailAndPassword(email, pass).then(cred=>{
+    const newUid = cred.user.uid;
+    return db.ref('teachers/'+newUid).set({
+      name, email, role:'teacher', active:true, createdAt:Date.now(), createdBy: currentUser.uid
+    }).then(()=> sAuth.signOut());
+  }).then(()=>{
+    ntMsg(`✅ Hisob yaratildi. Email: ${email} · Parol: ${pass}`, 'green');
+    $('#nt-name').value=''; $('#nt-email').value=''; $('#nt-pass').value = genPass();
+    loadTeachersList();
+  }).catch(e=> ntMsg(friendlyAuthError(e.code)));
+}
+function loadTeachersList(){
   Promise.all([ db.ref('teachers').once('value'), db.ref('tests').once('value') ]).then(([tSnap, testSnap])=>{
     const teachers = tSnap.val()||{};
     const allTests = testSnap.val()||{};
-    const byOwner = {};
-    Object.values(allTests).forEach(t=>{
-      const o = t.ownerUid || '—';
-      byOwner[o] = byOwner[o] || {count:0, questions:0, name:t.ownerName||''};
-      byOwner[o].count++; byOwner[o].questions += (t.questions||[]).length;
-    });
-    const uids = new Set([...Object.keys(teachers), ...Object.keys(byOwner)]);
-    const rows = [...uids].map(uid=>{
-      const te = teachers[uid]||{}; const st = byOwner[uid]||{count:0,questions:0,name:''};
-      return {name: te.name || st.name || 'Noma\u2019lum', email: te.email || '—', count: st.count, questions: st.questions};
-    }).sort((a,b)=>b.count-a.count);
-    $('#ov-body').innerHTML = !rows.length ? `<p class="muted">Hali hech kim ro'yxatdan o'tmagan.</p>` :
-      `<table><tr><th>Laoshi</th><th>Email</th><th>Testlar</th><th>Savollar</th></tr>
-      ${rows.map(r=>`<tr><td style="font-weight:600">${esc(r.name)}</td><td>${esc(r.email)}</td><td>${r.count}</td><td>${r.questions}</td></tr>`).join('')}
-      </table>`;
+    const counts = {};
+    Object.values(allTests).forEach(t=>{ counts[t.ownerUid] = (counts[t.ownerUid]||0) + 1; });
+    const rows = Object.entries(teachers).sort((a,b)=>(a[1].name||'').localeCompare(b[1].name||''));
+    $('#t-list').innerHTML = !rows.length ? `<p class="muted">Hozircha hech kim yo'q.</p>` :
+      `<div style="overflow-x:auto"><table><tr><th>Ism</th><th>Email</th><th>Rol</th><th>Holat</th><th>Testlar</th><th>Amal</th></tr>
+      ${rows.map(([tuid,t])=>`<tr>
+        <td style="font-weight:600">${esc(t.name)}</td>
+        <td>${esc(t.email)}</td>
+        <td>${t.role==='admin' ? '<span class="pill p-blue">Administrator</span>' : 'Laoshi'}</td>
+        <td>${t.active===false ? '<span class="pill p-red">Cheklangan</span>' : '<span class="pill p-green">Faol</span>'}</td>
+        <td>${counts[tuid]||0}</td>
+        <td>${t.role==='admin' ? '' : `<button class="btn-ghost btn-sm" onclick="toggleTeacherActive('${tuid}', ${t.active===false})">${t.active===false?'Ruxsat berish':'Cheklash'}</button>`}</td>
+      </tr>`).join('')}</table></div>`;
   });
+}
+function toggleTeacherActive(tuid, makeActive){
+  db.ref('teachers/'+tuid+'/active').set(makeActive).then(loadTeachersList);
 }
 
 function renderTestList(){
@@ -399,7 +499,8 @@ function renderTestList(){
         <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;align-items:flex-start">
           <div>
             <h3>${esc(t.title)}</h3>
-            <p class="muted">${t.questions.length} savol · ${t.timeLimit} daqiqa · ${t.shuffleQ?'savollar aralash':'tartibli'} ${t.showMistakes?'· xatolar ko\u2018rsatiladi':''}</p>
+            <p class="muted">${t.questions.length} savol · ${t.timeLimit} daqiqa · ${t.attemptLimit||1} urinish · ${t.shuffleQ?'savollar aralash':'tartibli'} ${t.showMistakes?'· xatolar ko\u2018rsatiladi':''}</p>
+            ${(t.startAt || t.endAt) ? `<p class="muted">${t.startAt?`Boshlanadi: ${new Date(t.startAt).toLocaleString('uz-UZ',{dateStyle:'medium',timeStyle:'short'})}`:''}${t.startAt&&t.endAt?' · ':''}${t.endAt?`Tugaydi: ${new Date(t.endAt).toLocaleString('uz-UZ',{dateStyle:'medium',timeStyle:'short'})}`:''}</p>` : ''}
           </div>
           <div style="display:flex;gap:8px">
             <button class="btn-jade btn-sm" onclick="curTestId='${id}';setTab('dash')">📊 Natijalar</button>
@@ -435,6 +536,7 @@ function renderCreate(){
     <input id="c-title" placeholder="Masalan: HSK 2 · 5-dars grammatikasi">
     <div class="row">
       <div><label>Vaqt (daqiqa)</label><input id="c-time" type="number" value="20" min="1"></div>
+      <div><label>Urinishlar soni</label><input id="c-attempts" type="number" value="1" min="1"></div>
       <div><label>Savollar aralashsinmi?</label>
         <select id="c-shq"><option value="1">Ha (har kimda har xil tartib)</option><option value="0">Yo'q</option></select></div>
       <div><label>Variantlar aralashsinmi?</label>
@@ -442,18 +544,22 @@ function renderCreate(){
       <div><label>O'quvchi xatosini ko'rsinmi?</label>
         <select id="c-mis"><option value="0">Yo'q, faqat baho</option><option value="1">Ha, qaysi savolda xato qilganini</option></select></div>
     </div>
-    <label>Savollar <span class="muted" style="font-weight:400">(har savol <b>----</b> bilan ajratiladi, to'g'ri javob oldiga <b>#</b>)</span></label>
+    <div class="row">
+      <div><label>Boshlanish vaqti <span class="muted" style="font-weight:400">(ixtiyoriy)</span></label><input id="c-start" type="datetime-local"></div>
+      <div><label>Tugash vaqti <span class="muted" style="font-weight:400">(ixtiyoriy)</span></label><input id="c-end" type="datetime-local"></div>
+    </div>
+    <label>Savollar <span class="muted" style="font-weight:400">(har savol <b>---</b> bilan ajratiladi; variant oldiga A./B./C. qo'yishingiz mumkin, to'g'ri javob oldiga <b>#</b>)</span></label>
     <textarea id="c-body" rows="14" placeholder="1. «你好» so'zi nima degani?
-Rahmat
-# Salom
-Xayr
-Kechirasiz
-----
+A. Rahmat
+#B. Salom
+C. Xayr
+D. Kechirasiz
+---
 2. «我是学生» gapida «学生» nima?
-Fe'l
-# Ot (talaba)
-Sifat
-----
+A. Fe'l
+#B. Ot (talaba)
+C. Sifat
+---
 3. ..."></textarea>
     <label>Baho mezoni <span class="muted" style="font-weight:400">(foiz = baho; laoshi o'zi belgilaydi)</span></label>
     <textarea id="c-crit" rows="4">86 = 5 (A'lo)
@@ -473,7 +579,7 @@ function previewTest(){
     (errors.length ? `<div class="note red"><b>Xatolar:</b><br>${errors.map(esc).join('<br>')}</div>` : '') +
     (questions.length ? `<div class="note green"><b>${questions.length} savol topildi.</b></div>` +
       questions.map((q,i)=>`<div class="q-card"><div class="q-text"><span class="q-num">${i+1}.</span>${esc(q.q)}</div>
-        ${q.options.map((o,j)=>`<div class="opt" style="cursor:default ${j===q.correct?';border-color:var(--jade);background:var(--jade-soft)':''}">${j===q.correct?'✅':'⚪'} ${esc(o)}</div>`).join('')}
+        ${q.options.map((o,j)=>`<div class="opt" style="cursor:default ${j===q.correct?';border-color:var(--jade);background:var(--jade-soft)':''}">${j===q.correct?'✅':'⚪'} <b>${LETTERS[j]}.</b> ${esc(o)}</div>`).join('')}
       </div>`).join('') : '');
 }
 function saveTest(){
@@ -484,10 +590,15 @@ function saveTest(){
   if(errors.length) return alert('Avval xatolarni tuzating:\n'+errors.join('\n'));
   if(!questions.length) return alert('Savollar topilmadi');
   if(!criteria.length) return alert('Baho mezonini kiriting');
+  const startAt = $('#c-start').value ? new Date($('#c-start').value).getTime() : null;
+  const endAt = $('#c-end').value ? new Date($('#c-end').value).getTime() : null;
+  if(startAt && endAt && endAt <= startAt) return alert("Tugash vaqti boshlanish vaqtidan keyin bo'lishi kerak");
   const id = uid(6);
   db.ref('tests/'+id).set({
     title, questions, criteria,
     timeLimit: Math.max(1, +$('#c-time').value||20),
+    attemptLimit: Math.max(1, +$('#c-attempts').value||1),
+    startAt, endAt,
     shuffleQ: $('#c-shq').value==='1', shuffleO: $('#c-sho').value==='1',
     showMistakes: $('#c-mis').value==='1',
     ownerUid: currentUser.uid, ownerName: currentUser.displayName || currentUser.email,
@@ -628,11 +739,31 @@ function studentEntry(testId){
     if(sid){
       db.ref(`sessions/${testId}/${sid}`).once('value').then(s=>{
         const sess = s.val();
-        if(!sess){ localStorage.removeItem('lt_sid_'+testId); return renderJoin(testId,test); }
+        if(!sess){ localStorage.removeItem('lt_sid_'+testId); return renderJoinGate(testId,test); }
         resumeStudent(testId, sid, test, sess);
       });
-    } else renderJoin(testId, test);
+    } else renderJoinGate(testId, test);
   });
+}
+function renderJoinGate(testId, test){
+  const now = Date.now();
+  if(test.startAt && now < test.startAt) return renderAvailability(test, 'not-started');
+  if(test.endAt && now > test.endAt) return renderAvailability(test, 'ended');
+  renderJoin(testId, test);
+}
+function renderAvailability(test, kind){
+  const fmt = ts => new Date(ts).toLocaleString('uz-UZ', {dateStyle:'medium', timeStyle:'short'});
+  app.innerHTML = `
+  <div class="narrow" style="margin:0 auto">
+    <div class="brand"><div class="seal">考</div><div><h1>${esc(test.title)}</h1></div></div>
+    <div class="card center" style="margin-top:10px">
+      <div style="font-size:44px">${kind==='not-started'?'⏳':'🔒'}</div>
+      <h2>${kind==='not-started' ? 'Test hali boshlanmagan' : 'Test vaqti tugagan'}</h2>
+      <p class="muted">${kind==='not-started'
+        ? `Boshlanish vaqti: <b>${fmt(test.startAt)}</b>`
+        : `Tugash vaqti: <b>${fmt(test.endAt)}</b> da yakunlangan.`}</p>
+    </div>
+  </div>`;
 }
 function renderJoin(testId, test){
   app.innerHTML = `
@@ -661,16 +792,16 @@ function startStudent(testId){
   const optOrders = t.questions.map(q => t.shuffleO ? shuffle(q.options.map((_,j)=>j)) : q.options.map((_,j)=>j));
   const deadline = Date.now() + t.timeLimit*60000;
   db.ref(`sessions/${testId}/${sid}`).set({
-    name, status:'active', startedAt:Date.now(), deadline, violations:0,
+    name, status:'active', startedAt:Date.now(), deadline, violations:0, attempts:1,
     order, optOrders
-  }).then(()=> runTest(testId, sid, t, {name, order, optOrders, deadline, answers:{}}));
+  }).then(()=> runTest(testId, sid, t, {name, order, optOrders, deadline, answers:{}, attempts:1}));
 }
 function resumeStudent(testId, sid, test, sess){
-  if(sess.status === 'finished') return renderResult(test, sess);
+  if(sess.status === 'finished'){ ST = {testId, sid, test}; return renderResult(test, sess); }
   if(sess.status === 'locked')   return renderLocked(testId, sid, test);
   if(sess.status === 'reset'){
     localStorage.removeItem('lt_sid_'+testId);
-    return renderJoin(testId, test), ST={testId, test};
+    return renderJoinGate(testId, test);
   }
   if(sess.status === 'approved'){
     // continue: new deadline from remaining
@@ -685,7 +816,7 @@ function runTest(testId, sid, test, sess){
   ST = {testId, sid, test, deadline: sess.deadline,
         order: sess.order || test.questions.map((_,i)=>i),
         optOrders: sess.optOrders || test.questions.map(q=>q.options.map((_,j)=>j)),
-        answers: sess.answers || {}, active:true};
+        answers: sess.answers || {}, attempts: sess.attempts || 1, active:true};
   ST.sessRef = db.ref(`sessions/${testId}/${sid}`);
 
   // watch for teacher reset while writing
@@ -712,10 +843,10 @@ function runTest(testId, sid, test, sess){
     const q = test.questions[qi];
     return `<div class="q-card">
       <div class="q-text"><span class="q-num">${pos+1}.</span>${esc(q.q)}</div>
-      ${ST.optOrders[qi].map(oj=>`
+      ${ST.optOrders[qi].map((oj, li)=>`
         <label class="opt ${ST.answers[qi]===oj?'sel':''}" data-q="${qi}" data-o="${oj}">
           <input type="radio" name="q${qi}" ${ST.answers[qi]===oj?'checked':''} onchange="pick(${qi},${oj},this)">
-          <span>${esc(q.options[oj])}</span>
+          <span><b>${LETTERS[li]}.</b> ${esc(q.options[oj])}</span>
         </label>`).join('')}
     </div>`;
   }).join('');
@@ -736,6 +867,10 @@ function runTest(testId, sid, test, sess){
   ST.onBlur = ()=> lockNow('Boshqa oynaga o\u2018tdi');
   document.addEventListener('visibilitychange', ST.onHide);
   window.addEventListener('blur', ST.onBlur);
+
+  // tasodifan chiqib ketishdan ogohlantirish (yopish/yangilash urinishida)
+  ST.onBeforeUnload = e => { e.preventDefault(); e.returnValue = ''; };
+  window.addEventListener('beforeunload', ST.onBeforeUnload);
 }
 function pick(qi, oj, input){
   ST.answers[qi] = oj;
@@ -753,6 +888,7 @@ function detachStudent(){
   clearInterval(ST.timerInt);
   document.removeEventListener('visibilitychange', ST.onHide||(()=>{}));
   window.removeEventListener('blur', ST.onBlur||(()=>{}));
+  window.removeEventListener('beforeunload', ST.onBeforeUnload||(()=>{}));
   if(ST.sessRef) ST.sessRef.child('status').off();
 }
 function lockNow(reason){
@@ -793,11 +929,33 @@ function submitTest(timeout){
   const grade = gradeOf(percent, test.criteria);
   const result = {status:'finished', correct, percent, grade, timeout:!!timeout, finishedAt:Date.now()};
   ST.sessRef.update(result);
+  const attempts = ST.attempts;
   detachStudent();
-  renderResult(test, {...result, answers:ST.answers, name:''});
+  renderResult(test, {...result, answers:ST.answers, attempts, name:''});
+}
+function studentRetry(){
+  if(!ST) return;
+  const testId = ST.testId, sid = ST.sid, test = ST.test;
+  db.ref(`sessions/${testId}/${sid}`).once('value').then(s=>{
+    const sess = s.val();
+    const limit = test.attemptLimit || 1;
+    const used = sess.attempts || 1;
+    if(used >= limit){ alert("Urinishlar soni tugadi. Qayta boshlash uchun laoshidan so'rang."); return; }
+    const now = Date.now();
+    if(test.endAt && now > test.endAt){ alert("Test vaqti tugagan, qayta urinib bo'lmaydi."); return; }
+    const order = test.shuffleQ ? shuffle(test.questions.map((_,i)=>i)) : test.questions.map((_,i)=>i);
+    const optOrders = test.questions.map(q => test.shuffleO ? shuffle(q.options.map((_,j)=>j)) : q.options.map((_,j)=>j));
+    const deadline = now + test.timeLimit*60000;
+    const attempts = used + 1;
+    db.ref(`sessions/${testId}/${sid}`).update({
+      status:'active', answers:null, deadline, order, optOrders,
+      attempts, correct:null, percent:null, grade:null, timeout:null
+    }).then(()=> runTest(testId, sid, test, {name: sess.name, order, optOrders, deadline, answers:{}, attempts}));
+  });
 }
 function renderResult(test, sess){
-  const pass = sess.percent >= (test.criteria.find(c=>c.min>0)?.min ?? 56);
+  const attempts = sess.attempts || 1;
+  const canRetry = attempts < (test.attemptLimit || 1) && !(test.endAt && Date.now() > test.endAt);
   app.innerHTML = `
   <div class="narrow" style="margin:0 auto">
     <div class="card center" style="margin-top:30px">
@@ -805,6 +963,7 @@ function renderResult(test, sess){
       <div class="stamp ${sess.percent>=71?'pass':''}"><b>${sess.percent}%</b><span>${sess.correct}/${test.questions.length}</span></div>
       <h1 style="font-size:22px">Baho: ${esc(sess.grade)}</h1>
       <p class="muted" style="margin-top:8px">Natijangiz laoshiga yuborildi.</p>
+      ${canRetry ? `<button class="btn-jade" style="width:100%;margin-top:14px" onclick="studentRetry()">🔄 Qayta urinib ko'rish (${(test.attemptLimit-attempts)} ta imkoniyat qoldi)</button>` : ''}
     </div>
     ${test.showMistakes && sess.answers ? `<div class="card"><h2>Sizning javoblaringiz</h2>` +
       test.questions.map((q,i)=>{

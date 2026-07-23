@@ -37,7 +37,6 @@ jobs:
             messagingSenderId: "${{ secrets.FIREBASE_MSG_SENDER_ID }}",
             appId: "${{ secrets.FIREBASE_APP_ID }}"
           };
-          window.SUPER_ADMIN_EMAILS = ${{ secrets.SUPER_ADMIN_EMAILS || '[]' }};
           EOF
 
       - name: Sayt paketini tayyorlash

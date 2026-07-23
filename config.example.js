@@ -17,6 +17,6 @@ window.FIREBASE_CONFIG = {
   appId: ""
 };
 
-// Ixtiyoriy: shu ro'yxatdagi email'lar "🏫 Maktab nazorati" panelini ko'radi
-// (barcha laoshilar va ularning test sonlarini ko'rish uchun). Kerak bo'lmasa bo'sh qoldiring.
-window.SUPER_ADMIN_EMAILS = [];   // masalan: ["direktor@maktab.uz"]
+// Administrator email/parolini bu yerga yozish shart emas — saytni birinchi marta
+// #admin orqali ochganingizda "Administrator hisobini yaratish" ekrani chiqadi,
+// va o'sha yerda kiritgan hisobingiz avtomatik administrator bo'ladi.
