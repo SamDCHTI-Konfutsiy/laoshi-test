@@ -469,20 +469,65 @@ function loadTeachersList(){
   Promise.all([ db.ref('teachers').once('value'), db.ref('tests').once('value') ]).then(([tSnap, testSnap])=>{
     const teachers = tSnap.val()||{};
     const allTests = testSnap.val()||{};
-    const counts = {};
-    Object.values(allTests).forEach(t=>{ counts[t.ownerUid] = (counts[t.ownerUid]||0) + 1; });
+    const byOwner = {};
+    Object.entries(allTests).forEach(([tid,t])=>{ (byOwner[t.ownerUid] = byOwner[t.ownerUid]||[]).push({id:tid, ...t}); });
+    window.__teachersCache = teachers;
+    window.__teacherTestsCache = byOwner;
     const rows = Object.entries(teachers).sort((a,b)=>(a[1].name||'').localeCompare(b[1].name||''));
-    $('#t-list').innerHTML = !rows.length ? `<p class="muted">Hozircha hech kim yo'q.</p>` :
-      `<div style="overflow-x:auto"><table><tr><th>Ism</th><th>Email</th><th>Rol</th><th>Holat</th><th>Testlar</th><th>Amal</th></tr>
-      ${rows.map(([tuid,t])=>`<tr>
-        <td style="font-weight:600">${esc(t.name)}</td>
-        <td>${esc(t.email)}</td>
-        <td>${t.role==='admin' ? '<span class="pill p-blue">Administrator</span>' : 'Laoshi'}</td>
-        <td>${t.active===false ? '<span class="pill p-red">Cheklangan</span>' : '<span class="pill p-green">Faol</span>'}</td>
-        <td>${counts[tuid]||0}</td>
-        <td>${t.role==='admin' ? '' : `<button class="btn-ghost btn-sm" onclick="toggleTeacherActive('${tuid}', ${t.active===false})">${t.active===false?'Ruxsat berish':'Cheklash'}</button>`}</td>
-      </tr>`).join('')}</table></div>`;
+    $('#t-list').innerHTML = !rows.length ? `<div class="card"><p class="muted">Hozircha hech kim yo'q.</p></div>` :
+      rows.map(([tuid,t])=>{
+        const count = (byOwner[tuid]||[]).length;
+        return `<div class="card">
+          <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;align-items:flex-start">
+            <div>
+              <h3>${esc(t.name)}
+                ${t.role==='admin' ? '<span class="pill p-blue" style="margin-left:6px">Administrator</span>' : ''}
+                ${t.active===false ? '<span class="pill p-red" style="margin-left:6px">Cheklangan</span>' : '<span class="pill p-green" style="margin-left:6px">Faol</span>'}
+              </h3>
+              <p class="muted">${esc(t.email)} · ${count} ta test</p>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              ${count>0 ? `<button class="btn-ghost btn-sm" onclick="toggleTeacherTests('${tuid}')">📚 Testlari</button>` : ''}
+              ${t.role!=='admin' ? `<button class="btn-ghost btn-sm" onclick="adminResetTeacherPass('${tuid}')">🔑 Parolni tiklash</button>` : ''}
+              ${t.role!=='admin' ? `<button class="btn-ghost btn-sm" onclick="toggleTeacherActive('${tuid}', ${t.active===false})">${t.active===false?'Ruxsat berish':'Cheklash'}</button>` : ''}
+            </div>
+          </div>
+          <div id="tt-${tuid}" class="hidden" style="margin-top:12px"></div>
+        </div>`;
+      }).join('');
   });
+}
+function toggleTeacherTests(tuid){
+  const el = document.getElementById('tt-'+tuid); if(!el) return;
+  if(!el.classList.contains('hidden')){ el.classList.add('hidden'); return; }
+  el.classList.remove('hidden');
+  const list = ((window.__teacherTestsCache||{})[tuid] || []).slice().sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  el.innerHTML = !list.length ? `<p class="muted">Testlari yo'q.</p>` : list.map(t=>{
+    const link = location.origin + location.pathname + '?t=' + t.id;
+    return `<div class="card" style="background:var(--paper);margin-bottom:10px">
+      <h3>${esc(t.title)}</h3>
+      <p class="muted">${t.questions.length} savol · ${t.timeLimit} daqiqa · ${t.attemptLimit||1} urinish</p>
+      <div class="linkbox">
+        <input readonly value="${link}" onclick="this.select()">
+        <button class="btn-p btn-sm" onclick="navigator.clipboard.writeText('${link}');this.textContent='✓'">Nusxa</button>
+        <button class="btn-ghost btn-sm" onclick="toggleQR(this,'${link}')">QR</button>
+        <button class="btn-ghost btn-sm" onclick="adminDeleteTeacherTest('${t.id}','${tuid}')">🗑</button>
+      </div>
+      <div class="qr-slot center"></div>
+    </div>`;
+  }).join('');
+}
+function adminDeleteTeacherTest(id, tuid){
+  if(!confirm("Testni va barcha natijalarni o'chirishni tasdiqlaysizmi?")) return;
+  Promise.all([ db.ref('tests/'+id).remove(), db.ref('sessions/'+id).remove() ])
+    .then(()=>{ loadTeachersList(); });
+}
+function adminResetTeacherPass(tuid){
+  const t = (window.__teachersCache||{})[tuid]; if(!t) return;
+  if(!confirm(`${t.email} ga parolni tiklash havolasi yuborilsinmi?`)) return;
+  auth.sendPasswordResetEmail(t.email)
+    .then(()=> alert("✅ Parolni tiklash havolasi yuborildi: " + t.email))
+    .catch(e=> alert("Xatolik: " + friendlyAuthError(e.code)));
 }
 function toggleTeacherActive(tuid, makeActive){
   db.ref('teachers/'+tuid+'/active').set(makeActive).then(loadTeachersList);
