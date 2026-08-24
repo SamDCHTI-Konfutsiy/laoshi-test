@@ -391,7 +391,17 @@ function doLogin(){
   const pass = $('#a-pass').value;
   if(!email || !pass) return authMsg("Email va parolni kiriting");
   authMsg('');
-  auth.signInWithEmailAndPassword(email, pass).catch(e=>authMsg(friendlyAuthError(e.code)));
+  // Muvaffaqiyatli kirishdan keyin panelga o'tishni onAuthStateChanged'ga qoldirmaymiz:
+  // u faqat location.hash === '#admin' bo'lgandagina ishlaydi, aks holda ekran jim qoladi.
+  authBusy = true;
+  auth.signInWithEmailAndPassword(email, pass)
+    .then(()=>{
+      authBusy = false;
+      currentUser = auth.currentUser;
+      if(location.hash === '#admin') adminRoute();
+      else location.hash = '#admin';   // hashchange -> loadingScreen + adminRoute
+    })
+    .catch(e=>{ authBusy = false; authMsg(friendlyAuthError(e.code)); });
 }
 function doReset(){
   const email = $('#a-email').value.trim();
