@@ -141,6 +141,9 @@ footer{margin-top:40px;text-align:center;color:var(--ink-soft);font-size:12.5px}
    va sayt "Firebase hali ulanmagan" ekranini ko'rsatadi.)
    ============================================================ */
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || {};
+// Google Apps Script backend manzili — faqat "111111ga majburiy tiklash" tugmasi uchun kerak.
+// Bo'sh qoldirilsa, tugma buni tushuntirib xato ko'rsatadi (sayt boshqa hamma joyda odatdagidek ishlayveradi).
+const APPS_SCRIPT_URL = window.APPS_SCRIPT_URL || '';
 
 const $ = s => document.querySelector(s);
 const app = $('#app');
@@ -407,6 +410,46 @@ function doLogout(){
   auth.signOut().then(()=>{ location.hash=''; renderLanding(); });
 }
 
+/* ---------- O'z parolini almashtirish (email/"unutdingizmi" flowsiz, panelning o'zidan) ---------- */
+function openChangePasswordModal(){
+  document.body.insertAdjacentHTML('beforeend', `
+  <div class="modal-bg" onclick="if(event.target===this)this.remove()">
+    <div class="modal">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <h2 style="margin:0">🔑 Parolni almashtirish</h2>
+        <button class="btn-ghost btn-sm" onclick="document.querySelector('.modal-bg').remove()">✕</button>
+      </div>
+      <label>Joriy parol</label>
+      <input id="cp-old" type="password" autocomplete="current-password" placeholder="hozirgi parolingiz">
+      <label>Yangi parol</label>
+      <input id="cp-new" type="password" autocomplete="new-password" placeholder="kamida 6 belgi">
+      <label>Yangi parolni tasdiqlang</label>
+      <input id="cp-new2" type="password" autocomplete="new-password" placeholder="yana bir marta" onkeydown="if(event.key==='Enter')doChangePassword()">
+      <div id="cp-err"></div>
+      <div style="margin-top:14px"><button class="btn-p" onclick="doChangePassword()">Saqlash</button></div>
+    </div>
+  </div>`);
+  $('#cp-old').focus();
+}
+function doChangePassword(){
+  const oldPass = $('#cp-old').value;
+  const newPass = $('#cp-new').value;
+  const newPass2 = $('#cp-new2').value;
+  const err = m => { $('#cp-err').innerHTML = m ? `<div class="note red">${esc(m)}</div>` : ''; };
+  if(!oldPass) return err("Joriy parolingizni kiriting");
+  if(newPass.length < 6) return err("Yangi parol kamida 6 belgi bo'lsin");
+  if(newPass !== newPass2) return err("Yangi parollar bir xil emas");
+  err('');
+  const cred = firebase.auth.EmailAuthProvider.credential(currentUser.email, oldPass);
+  currentUser.reauthenticateWithCredential(cred)
+    .then(()=> currentUser.updatePassword(newPass))
+    .then(()=>{
+      document.querySelector('.modal-bg').remove();
+      alert("✅ Parolingiz muvaffaqiyatli almashtirildi.");
+    })
+    .catch(e=> err(friendlyAuthError(e.code)));
+}
+
 /* ================= ADMIN ================= */
 let adminTab = 'tests', tests = {}, sharedTests = {}, allTests = {}, sessListener = null, curTestId = null,
     sharedTestsListenerRef = null, announceListenerRef = null, allTestsListenerRef = null;
@@ -421,7 +464,10 @@ function renderAdmin(){
       <div class="seal">考</div><div><h1>Laoshi paneli</h1>
       <small>${esc(name)} · ${esc(currentUser.email)} ${isAdmin?'<span class="pill p-blue" style="margin-left:6px">Administrator</span>':''}</small></div>
     </div>
-    <button class="btn-ghost btn-sm" onclick="doLogout()">Chiqish</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn-ghost btn-sm" onclick="openChangePasswordModal()">🔑 Parolni almashtirish</button>
+      <button class="btn-ghost btn-sm" onclick="doLogout()">Chiqish</button>
+    </div>
   </div>
   <div id="announceBanner"></div>
   <div class="tabs">
@@ -509,8 +555,8 @@ function loadAnnounceList(){
 
 /* ---------- LAOSHILAR (faqat administrator) ---------- */
 function genPass(){
-  const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789';
-  return Array.from({length:8},()=>chars[Math.floor(Math.random()*chars.length)]).join('');
+  // Standart vaqtinchalik parol endi doim shu — tasodifiy emas (kerak bo'lsa forma ichida qo'lda o'zgartirsa bo'ladi).
+  return '111111';
 }
 function ntMsg(msg, type){
   const el = $('#nt-err'); if(el) el.innerHTML = msg ? `<div class="note ${type||'red'}">${esc(msg)}</div>` : '';
@@ -580,7 +626,8 @@ function loadTeachersList(){
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
               ${count>0 ? `<button class="btn-ghost btn-sm" onclick="toggleTeacherTests('${tuid}')">📚 Testlari</button>` : ''}
-              ${!isSelf ? `<button class="btn-ghost btn-sm" onclick="adminResetTeacherPass('${tuid}')">🔑 Parolni tiklash</button>` : ''}
+              ${!isSelf ? `<button class="btn-ghost btn-sm" onclick="adminResetTeacherPass('${tuid}')">📧 Reset havola yuborish</button>` : ''}
+              ${!isSelf ? `<button class="btn-ghost btn-sm" onclick="adminForcePasswordReset('${tuid}')">🔁 111111ga tiklash</button>` : ''}
               ${(t.role!=='admin') ? `<button class="btn-ghost btn-sm" onclick="promoteToAdmin('${tuid}')">⬆️ Administrator qilish</button>` : ''}
               ${(t.role==='admin' && !isSelf) ? `<button class="btn-ghost btn-sm" onclick="demoteToTeacher('${tuid}')">⬇️ Laoshi qilish</button>` : ''}
               ${(t.role!=='admin') ? `<button class="btn-ghost btn-sm" onclick="toggleTeacherActive('${tuid}', ${t.active===false})">${t.active===false?'Ruxsat berish':'Cheklash'}</button>` : ''}
@@ -636,6 +683,28 @@ function adminResetTeacherPass(tuid){
 }
 function toggleTeacherActive(tuid, makeActive){
   db.ref('teachers/'+tuid+'/active').set(makeActive).then(loadTeachersList);
+}
+/* ---------- "111111"ga majburiy reset (email ishlamaydigan fake hisoblar uchun) ----------
+   Firebase Auth qoidasi bo'yicha admin boshqa birovning parolini to'g'ridan-to'g'ri o'zgartira olmaydi —
+   bu chindan ham server tomonda (Google Apps Script) tekshiriladigan, alohida joylashtirilgan kichik
+   backend orqali amalga oshadi. Sozlash uchun README'dagi "Majburiy parol reset (Apps Script)" bo'limiga qarang. */
+function adminForcePasswordReset(tuid){
+  const t = (window.__teachersCache||{})[tuid]; if(!t) return;
+  if(!APPS_SCRIPT_URL){
+    alert("Bu funksiya hali sozlanmagan. README'dagi \"Majburiy parol reset (Apps Script)\" bo'limini bajarib,\nAPPS_SCRIPT_URL manzilini config.js'ga qo'shing.");
+    return;
+  }
+  if(!confirm(`${t.name} (${t.email}) parolini "111111" ga majburan o'zgartirasizmi? Bu hisob endi shu parol bilan kira oladi.`)) return;
+  currentUser.getIdToken().then(idToken=>{
+    return fetch(APPS_SCRIPT_URL, {
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'}, // Apps Script CORS preflightni chetlab o'tish uchun oddiy matn sifatida yuboriladi
+      body: JSON.stringify({idToken, targetUid: tuid})
+    });
+  }).then(r=>r.json()).then(res=>{
+    if(res.ok) alert(`✅ ${t.email} parol "111111" ga tiklandi.`);
+    else alert("❌ Xatolik: " + (res.error || 'nomaʼlum xato'));
+  }).catch(e=> alert("❌ Ulanishda xatolik: " + e.message));
 }
 
 function renderTestList(){

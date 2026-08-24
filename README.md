@@ -104,9 +104,16 @@ Shuning uchun bu qadamni ishonchli odamning o'zi, birinchi bo'lib bajarishi kera
 ### Administrator imkoniyatlari
 
 - **👥 Laoshilar** bo'limida yangi laoshiga ism/email/vaqtinchalik parol kiritib hisob ochadi (laoshi
-  ro'yxatdan o'zi o'tmaydi — barcha hisoblarni faqat administrator yaratadi)
-- Yaratilgan email+parolni laoshiga o'zi yetkazadi; laoshi keyin **"Parolni unutdingizmi?"** orqali
+  ro'yxatdan o'zi o'tmaydi — barcha hisoblarni faqat administrator yaratadi). Vaqtinchalik parol
+  maydoni standart holda **`111111`** bilan to'ldirilgan keladi (xohlasa admin qo'lda boshqasiga
+  o'zgartirishi ham mumkin, lekin odatda shunchaki shu holicha qoldirsa bo'ladi)
+- Yaratilgan email+parolni laoshiga o'zi yetkazadi; laoshi keyin panel ichidagi
+  **🔑 Parolni almashtirish** tugmasi (yoki "Parolni unutdingizmi?" email-havolasi) orqali
   o'z parolini almashtirishi mumkin
+- Agar laoshi paroli **butunlay unutilgan va email ham ishlamaydigan fake hisob** bo'lsa, har bir
+  qator yonidagi **"🔁 111111ga tiklash"** tugmasi orqali parolni majburan `111111` ga qaytarish
+  mumkin (buning uchun bir martalik qo'shimcha sozlash kerak — pastdagi **"Majburiy parol reset
+  (Apps Script)"** bo'limiga qarang)
 - Har bir laoshi qatorida **"Cheklash"** tugmasi bor — bosilsa, o'sha laoshi tizimga kira olmay qoladi
   (keyinchalik **"Ruxsat berish"** bilan qaytarish mumkin)
 - Administratorning o'zi ham oddiy laoshi kabi test yaratishi va natijalarni ko'rishi mumkin
@@ -116,8 +123,49 @@ Shuning uchun bu qadamni ishonchli odamning o'zi, birinchi bo'lib bajarishi kera
 
 - Faqat **o'zi yaratgan testlarni va faqat o'z o'quvchilari natijalarini** ko'radi
 - Cheksiz test yaratishi mumkin
+- Panel yuqorisidagi **🔑 Parolni almashtirish** tugmasi orqali, "Parolni unutdingizmi"
+  email-havolasiga muhtoj bo'lmasdan, joriy parolini bilgan holda o'zi yangi parol
+  o'rnatishi mumkin (masalan, admin bergan `111111` ni birinchi kirishdayoq almashtirish uchun)
 - Agar administrator uni cheklasa, keyingi kirishda **"Hisobingiz cheklangan"** xabari chiqadi va
   tizimga kira olmaydi
+
+## 3.5 Majburiy parol reset (Apps Script) — parol unutilgan/fake hisoblar uchun
+
+Oddiy holatda laoshi parolini o'zi almashtiradi (pastga qarang) yoki "Parolni unutdingizmi?"
+orqali email havolasi oladi. Lekin admin tomonidan test uchun ochilgan **fake** hisoblarda
+email haqiqiy emas — havola hech qayerga bormaydi. Bunday hollarda Firebase (xavfsizlik
+sababli) admin panelidan to'g'ridan-to'g'ri "boshqa birovning parolini o'zgartirish"ga
+ruxsat bermaydi — buning uchun kichik, **butunlay bepul** yordamchi backend kerak bo'ladi
+(Google Apps Script orqali, Firebase to'lov rejasi shart emas).
+
+O'rnatilgach, admin panelida **👥 Laoshilar** bo'limida har bir hisob yonida
+**"🔁 111111ga tiklash"** tugmasi ishlay boshlaydi — bosilsa, o'sha hisob paroli darhol
+`111111` ga o'zgaradi (boshqa parolni admin tanlay olmaydi — atayin shunday, xavfsizlik
+uchun). Sozlamasangiz ham sayt boshqa hamma joyda odatdagidek ishlayveradi, faqat shu bitta
+tugma "sozlanmagan" deb xabar beradi.
+
+**1) Xizmat hisobi (service account) yaratish**
+1. https://console.cloud.google.com → yuqorida loyihangizni tanlang (Firebase bilan bir xil, masalan `laoshi-test-8becd`)
+2. **IAM & Admin → Service Accounts → + Create Service Account** → nom bering (masalan `laoshi-admin-reset`) → Create and continue
+3. Rol qo'shing: **Firebase Authentication Admin** va **Firebase Realtime Database Admin** (ikkalasi ham) → Done
+4. Yaratilgan hisobni oching → **Keys → Add key → Create new key → JSON** → fayl kompyuteringizga yuklab olinadi (buni hech kimga bermang, faqat keyingi qadamda ishlatiladi)
+
+**2) Google Apps Script loyihasi**
+1. https://script.google.com → **New project**
+2. Standart `Code.gs` ichidagini o'chirib, repodagi `apps-script/Code.gs` faylining butun matnini joylashtiring
+3. Fayl boshidagi uchta qatorni to'ldiring — qiymatlar `config.js` dagilar bilan **bir xil** bo'lishi kerak:
+   `FIREBASE_PROJECT_ID`, `FIREBASE_API_KEY`, `FIREBASE_DB_URL`
+4. Chap menyu **Project Settings (⚙️) → Script Properties → Add script property**:
+   - nomi: `SERVICE_ACCOUNT_JSON`, qiymati: 1-qadamda yuklab olingan JSON faylning **butun matni** (bir butun qator sifatida yopishtiring)
+5. **Deploy → New deployment** → ⚙️ dan **Web app** turini tanlang:
+   - Execute as: **Me**
+   - Who has access: **Anyone**
+   - **Deploy** → chiqqan **Web app URL**'ni nusxalab oling (`https://script.google.com/macros/s/.../exec`)
+   - (Kod keyinroq o'zgarsa, qayta **Deploy → Manage deployments → ✏️ → New version** qilishni unutmang)
+
+**3) Saytga ulash**
+- `config.js` ichidagi `window.APPS_SCRIPT_URL` qatoriga 2-qadamdagi Web app URL'ni qo'ying, saqlang va GitHub'ga qayta yuklang (yoki push qiling)
+- Tayyor — endi admin panelida "🔁 111111ga tiklash" tugmasi ishlaydi
 
 ## 4. Ishlatish
 
