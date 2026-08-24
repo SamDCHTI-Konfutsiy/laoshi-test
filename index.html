@@ -417,7 +417,10 @@ function doLogout(){
   if(announceListenerRef){ announceListenerRef.off(); announceListenerRef=null; }
   if(sessListener) sessListener.off();
   tests = {}; sharedTests = {}; allTests = {}; curTestId = null; currentProfile = null;
-  auth.signOut().then(()=>{ location.hash=''; renderLanding(); });
+  logEvent('auth.logout').then(()=>{
+    window.__sessionLogged = false;
+    return auth.signOut();
+  }).then(()=>{ location.hash=''; renderLanding(); });
 }
 
 /* ---------- O'z parolini almashtirish (email/"unutdingizmi" flowsiz, panelning o'zidan) ---------- */
@@ -455,6 +458,7 @@ function doChangePassword(){
     .then(()=> currentUser.updatePassword(newPass))
     .then(()=>{
       document.querySelector('.modal-bg').remove();
+      logEvent('auth.password');
       alert("✅ Parolingiz muvaffaqiyatli almashtirildi.");
     })
     .catch(e=> err(friendlyAuthError(e.code)));
@@ -486,6 +490,8 @@ function renderAdmin(){
     <div class="tab ${adminTab==='dash'?'on':''}" data-tab="dash" onclick="setTab('dash')">📊 Jonli natijalar</div>
     ${isAdmin ? `<div class="tab ${adminTab==='teachers'?'on':''}" data-tab="teachers" onclick="setTab('teachers')">👥 Laoshilar</div>` : ''}
     ${isAdmin ? `<div class="tab ${adminTab==='announce'?'on':''}" data-tab="announce" onclick="setTab('announce')">📢 E'lonlar</div>` : ''}
+    ${isAdmin ? `<div class="tab ${adminTab==='logs'?'on':''}" data-tab="logs" onclick="setTab('logs')">🧾 Qaydlar</div>` : ''}
+    <div class="tab ${adminTab==='trash'?'on':''}" data-tab="trash" onclick="setTab('trash')">🗑 Korzinka</div>
   </div>
   <div id="tabBody"></div>`;
   if(testsListenerRef) testsListenerRef.off();
@@ -503,6 +509,7 @@ function renderAdmin(){
   if(announceListenerRef) announceListenerRef.off();
   announceListenerRef = db.ref('announcements').limitToLast(3);
   announceListenerRef.on('value', snap=> renderAnnounceBanner(snap.val()||{}));
+  if(!window.__sessionLogged){ window.__sessionLogged = true; logEvent('auth.login'); purgeOldTrash(); }
   setTab(adminTab);
 }
 function dashTestsSource(){ return currentProfile.role==='admin' ? allTests : tests; }
@@ -516,7 +523,7 @@ function renderAnnounceBanner(items){
     </div>`).join('');
 }
 function setTab(t){
-  if((t==='teachers'||t==='announce') && currentProfile.role!=='admin') t = 'tests';
+  if((t==='teachers'||t==='announce'||t==='logs') && currentProfile.role!=='admin') t = 'tests';
   adminTab = t;
   document.querySelectorAll('.tab').forEach(el=>el.classList.toggle('on', el.dataset.tab===t));
   if(t==='tests') renderTestList();
@@ -524,6 +531,8 @@ function setTab(t){
   if(t==='dash') renderDash();
   if(t==='teachers') renderTeachers();
   if(t==='announce') renderAnnounce();
+  if(t==='logs') renderLogs();
+  if(t==='trash') renderTrash();
 }
 function renderAnnounce(){
   $('#tabBody').innerHTML = `
@@ -547,7 +556,8 @@ function postAnnounce(){
   db.ref('announcements/'+id).set({
     title, body, createdAt: Date.now(),
     authorUid: currentUser.uid, authorName: currentProfile.name || currentUser.email
-  }).then(()=>{ $('#an-title').value=''; $('#an-body').value=''; loadAnnounceList(); });
+  }).then(()=> logEvent('announce.create', { targetId:id, targetName:title }))
+    .then(()=>{ $('#an-title').value=''; $('#an-body').value=''; loadAnnounceList(); });
 }
 function loadAnnounceList(){
   db.ref('announcements').once('value').then(snap=>{
@@ -558,7 +568,7 @@ function loadAnnounceList(){
         <div style="display:flex;justify-content:space-between;gap:10px">
           <div><b>${esc(a.title)}</b><p class="muted">${esc(a.body)}</p>
           <p class="muted">${esc(a.authorName||'')} · ${new Date(a.createdAt).toLocaleString('uz-UZ',{dateStyle:'medium',timeStyle:'short'})}</p></div>
-          <button class="btn-ghost btn-sm" onclick="db.ref('announcements/${id}').remove().then(loadAnnounceList)">🗑</button>
+          <button class="btn-ghost btn-sm" onclick="delAnnounce('${id}')">🗑</button>
         </div></div>`).join('');
   });
 }
@@ -606,6 +616,7 @@ function adminCreateTeacher(){
       name, email, role, active:true, createdAt:Date.now(), createdBy: currentUser.uid
     }).then(()=> sAuth.signOut());
   }).then(()=>{
+    logEvent('teacher.create', { targetName:name, note:`${email} · rol: ${role==='admin'?'administrator':'laoshi'}` });
     ntMsg(`✅ Hisob yaratildi (${role==='admin'?'Administrator':'Laoshi'}). Email: ${email} · Parol: ${pass}`, 'green');
     $('#nt-name').value=''; $('#nt-email').value=''; $('#nt-pass').value = genPass(); $('#nt-role').value='teacher';
     loadTeachersList();
@@ -641,6 +652,7 @@ function loadTeachersList(){
               ${(t.role!=='admin') ? `<button class="btn-ghost btn-sm" onclick="promoteToAdmin('${tuid}')">⬆️ Administrator qilish</button>` : ''}
               ${(t.role==='admin' && !isSelf) ? `<button class="btn-ghost btn-sm" onclick="demoteToTeacher('${tuid}')">⬇️ Laoshi qilish</button>` : ''}
               ${(t.role!=='admin') ? `<button class="btn-ghost btn-sm" onclick="toggleTeacherActive('${tuid}', ${t.active===false})">${t.active===false?'Ruxsat berish':'Cheklash'}</button>` : ''}
+              ${(!isSelf && t.role!=='admin') ? `<button class="btn-ghost btn-sm" onclick="adminDeleteTeacher('${tuid}')">🗑 Hisobni o'chirish</button>` : ''}
             </div>
           </div>
           <div id="tt-${tuid}" class="hidden" style="margin-top:12px"></div>
@@ -651,12 +663,16 @@ function loadTeachersList(){
 function promoteToAdmin(tuid){
   const t = (window.__teachersCache||{})[tuid]; if(!t) return;
   if(!confirm(`${t.name} administrator qilinsinmi? U boshqa laoshilarni boshqara oladigan, hisob ochib/cheklay oladigan bo'ladi.`)) return;
-  db.ref('teachers/'+tuid+'/role').set('admin').then(loadTeachersList);
+  db.ref('teachers/'+tuid+'/role').set('admin')
+    .then(()=> logEvent('teacher.promote', { targetId:tuid, targetName:t.name, note:t.email }))
+    .then(loadTeachersList);
 }
 function demoteToTeacher(tuid){
   const t = (window.__teachersCache||{})[tuid]; if(!t) return;
   if(!confirm(`${t.name} oddiy laoshi qilinsinmi? U boshqa laoshilarni boshqara olmay qoladi.`)) return;
-  db.ref('teachers/'+tuid+'/role').set('teacher').then(loadTeachersList);
+  db.ref('teachers/'+tuid+'/role').set('teacher')
+    .then(()=> logEvent('teacher.demote', { targetId:tuid, targetName:t.name, note:t.email }))
+    .then(loadTeachersList);
 }
 function toggleTeacherTests(tuid){
   const el = document.getElementById('tt-'+tuid); if(!el) return;
@@ -667,12 +683,15 @@ function toggleTeacherTests(tuid){
     const link = location.origin + location.pathname + '?t=' + t.id;
     return `<div class="card" style="background:var(--paper);margin-bottom:10px">
       <h3>${esc(t.title)}</h3>
-      <p class="muted">${t.questions.length} savol · ${t.timeLimit} daqiqa · ${t.attemptLimit||1} urinish</p>
+      <p class="muted">${t.questions.length} savol · ${t.timeLimit} daqiqa · ${t.attemptLimit||1} urinish
+        ${t.shared ? '· <span class="pill p-blue">🌐 Umumiy</span>' : ''}${t.closed ? ' · <span class="pill p-red">🔒 Yopiq</span>' : ''}</p>
       <div class="linkbox">
         <input readonly value="${link}" onclick="this.select()">
         <button class="btn-p btn-sm" onclick="navigator.clipboard.writeText('${link}');this.textContent='✓'">Nusxa</button>
         <button class="btn-ghost btn-sm" onclick="toggleQR(this,'${link}')">QR</button>
         <button class="btn-jade btn-sm" onclick="curTestId='${t.id}';setTab('dash')">📊 Natijalar</button>
+        <button class="btn-ghost btn-sm" onclick="toggleTestClosed('${t.id}', ${!t.closed}, loadTeachersList)">${t.closed ? '🔓 Qayta ochish' : '🔒 Yakunlash'}</button>
+        <button class="btn-ghost btn-sm" onclick="toggleTestShared('${t.id}', ${!t.shared}, loadTeachersList)">${t.shared ? '🚫 Umumiydan chiqarish' : '🌐 Umumiyga qo\'shish'}</button>
         <button class="btn-ghost btn-sm" onclick="adminDeleteTeacherTest('${t.id}','${tuid}')">🗑</button>
       </div>
       <div class="qr-slot center"></div>
@@ -680,19 +699,37 @@ function toggleTeacherTests(tuid){
   }).join('');
 }
 function adminDeleteTeacherTest(id, tuid){
-  if(!confirm("Testni va barcha natijalarni o'chirishni tasdiqlaysizmi?")) return;
-  Promise.all([ db.ref('tests/'+id).remove(), db.ref('sessions/'+id).remove() ])
-    .then(()=>{ loadTeachersList(); });
+  delTest(id, loadTeachersList);
+}
+/* Hisobni o'chirish. Diqqat: bu bazadagi laoshi profilini korzinkaga oladi va tizimdan chiqaradi,
+   lekin Firebase Authentication'dagi hisobning o'zi saqlanib qoladi (uni brauzerdan o'chirib bo'lmaydi) —
+   shuning uchun o'sha email bilan qayta ro'yxatdan o'tkazib bo'lmaydi, faqat tiklash mumkin. */
+function adminDeleteTeacher(tuid){
+  const t = (window.__teachersCache||{})[tuid]; if(!t) return;
+  if(tuid === currentUser.uid) return alert("O'z hisobingizni o'chira olmaysiz.");
+  const own = (window.__teacherTestsCache||{})[tuid] || [];
+  if(!confirm(`${t.name} (${t.email}) hisobi korzinkaga o'tkazilsinmi?\n\n` +
+      (own.length ? `Uning ${own.length} ta testi joyida qoladi — kerak bo'lsa ularni alohida o'chirasiz.\n\n` : '') +
+      `Eslatma: hisob tizimga kira olmay qoladi, lekin Firebase'dagi email band bo'lib qolaveradi.`)) return;
+  trashPut('teacher', tuid, t.name, t, { targetUid:tuid, note:`${t.email} · ${own.length} ta test egasi` })
+    .then(()=> db.ref('teachers/'+tuid).remove())
+    .then(()=> logEvent('teacher.delete', { targetId:tuid, targetName:t.name, note:t.email }))
+    .then(loadTeachersList)
+    .catch(e=> alert("O'chirib bo'lmadi: " + e.message));
 }
 function adminResetTeacherPass(tuid){
   const t = (window.__teachersCache||{})[tuid]; if(!t) return;
   if(!confirm(`${t.email} ga parolni tiklash havolasi yuborilsinmi?`)) return;
   auth.sendPasswordResetEmail(t.email)
+    .then(()=> logEvent('teacher.pass.email', { targetId:tuid, targetName:t.name, note:t.email }))
     .then(()=> alert("✅ Parolni tiklash havolasi yuborildi: " + t.email))
     .catch(e=> alert("Xatolik: " + friendlyAuthError(e.code)));
 }
 function toggleTeacherActive(tuid, makeActive){
-  db.ref('teachers/'+tuid+'/active').set(makeActive).then(loadTeachersList);
+  const t = (window.__teachersCache||{})[tuid] || {};
+  db.ref('teachers/'+tuid+'/active').set(makeActive)
+    .then(()=> logEvent(makeActive ? 'teacher.allow' : 'teacher.restrict', { targetId:tuid, targetName:t.name, note:t.email }))
+    .then(loadTeachersList);
 }
 /* ---------- "111111"ga majburiy reset (email ishlamaydigan fake hisoblar uchun) ----------
    Firebase Auth qoidasi bo'yicha admin boshqa birovning parolini to'g'ridan-to'g'ri o'zgartira olmaydi —
@@ -712,7 +749,7 @@ function adminForcePasswordReset(tuid){
       body: JSON.stringify({idToken, targetUid: tuid})
     });
   }).then(r=>r.json()).then(res=>{
-    if(res.ok) alert(`✅ ${t.email} parol "111111" ga tiklandi.`);
+    if(res.ok){ logEvent('teacher.pass.force', { targetId:tuid, targetName:t.name, note:t.email }); alert(`✅ ${t.email} parol "111111" ga tiklandi.`); }
     else alert("❌ Xatolik: " + (res.error || 'nomaʼlum xato'));
   }).catch(e=> alert("❌ Ulanishda xatolik: " + e.message));
 }
@@ -745,6 +782,7 @@ function renderTestList(){
             ${(t.shared && isOwner) ? `<button class="btn-ghost btn-sm" onclick="toggleTemplateCopies('${id}')">🔗 Nusxalar</button>` : ''}
             ${canManage ? `<button class="btn-jade btn-sm" onclick="curTestId='${id}';setTab('dash')">📊 Natijalar</button>` : ''}
             ${canManage ? `<button class="btn-ghost btn-sm" onclick="toggleTestClosed('${id}', ${!t.closed})">${t.closed ? '🔓 Qayta ochish' : '🔒 Yakunlash'}</button>` : ''}
+            ${currentProfile.role==='admin' ? `<button class="btn-ghost btn-sm" onclick="toggleTestShared('${id}', ${!t.shared}, renderTestList)">${t.shared ? '🚫 Umumiydan chiqarish' : '🌐 Umumiyga qo\'shish'}</button>` : ''}
             ${canManage ? `<button class="btn-ghost btn-sm" onclick="delTest('${id}')">🗑</button>` : ''}
           </div>
         </div>
@@ -771,7 +809,8 @@ function spawnOwnCopy(templateId){
     shared: false, sourceTestId: templateId, sourceTitle: src.title,
     ownerUid: currentUser.uid, ownerName: currentProfile.name || currentUser.email,
     createdAt: Date.now()
-  }).then(()=>{
+  }).then(()=> logEvent('test.copy', { testId:id, testTitle:src.title, note:`manba: ${src.ownerName||''}` }))
+    .then(()=>{
     alert('Nusxa yaratildi! Bu endi sizning shaxsiy testingiz — havolasini pastdagi ro\u2018yxatdan oling.');
     renderTestList();
   });
@@ -800,12 +839,53 @@ function toggleQR(btn, link){
     `<img style="margin-top:12px;border:1px solid var(--line);border-radius:10px" width="180" height="180"
       src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(link)}">`;
 }
-function delTest(id){
-  if(!confirm("Testni va barcha natijalarni o'chirishni tasdiqlaysizmi?")) return;
-  db.ref('tests/'+id).remove(); db.ref('sessions/'+id).remove();
+function testMeta(id){
+  return (window.__visibleTestsCache||{})[id] || (allTests||{})[id] ||
+         ((window.__teacherTestsCache&&Object.values(window.__teacherTestsCache).flat().find(t=>t.id===id)) || {});
 }
-function toggleTestClosed(id, makeClosed){
-  db.ref('tests/'+id+'/closed').set(makeClosed);
+/* Test o'chirilganda yo'q qilinmaydi — sessiyalari bilan birga korzinkaga ko'chiriladi. */
+function delTest(id, after){
+  if(!confirm("Test korzinkaga o'tkazilsinmi? Natijalari ham u bilan birga saqlanadi va keyin tiklash mumkin.")) return;
+  Promise.all([ db.ref('tests/'+id).once('value'), db.ref('sessions/'+id).once('value') ]).then(([tS,sS])=>{
+    const t = tS.val();
+    if(!t) return alert('Test topilmadi.');
+    const sess = sS.val() || null;
+    const count = sess ? Object.keys(sess).length : 0;
+    return trashPut('test', t.ownerUid, t.title, { test:t, sessions:sess }, {
+      testId:id, note:`${(t.questions||[]).length} savol · ${count} ta natija`
+    })
+    .then(()=> db.ref().update({ ['tests/'+id]: null, ['sessions/'+id]: null }))
+    .then(()=> logEvent('test.delete', { testId:id, testTitle:t.title, ownerUid:t.ownerUid, ownerName:t.ownerName, note:`${count} ta natija bilan korzinkaga` }))
+    .then(()=>{ if(typeof after === 'function') after(); });
+  }).catch(e=> alert("O'chirib bo'lmadi: " + e.message));
+}
+function toggleTestClosed(id, makeClosed, after){
+  const t = testMeta(id);
+  db.ref('tests/'+id+'/closed').set(makeClosed)
+    .then(()=> logEvent(makeClosed ? 'test.close' : 'test.open', { testId:id, testTitle:t.title||'', ownerUid:t.ownerUid, ownerName:t.ownerName }))
+    .then(()=>{ if(typeof after === 'function') after(); });
+}
+/* Umumiylikni yoqish/o'chirish — faqat administrator. Laoshilar allaqachon olgan nusxalarga
+   bu ta'sir qilmaydi: nusxa alohida test, u o'z egasida qoladi. */
+function toggleTestShared(id, makeShared, after){
+  const t = testMeta(id);
+  const msg = makeShared
+    ? `"${t.title||'Test'}" umumiyga qo'shilsinmi? Barcha laoshilar uni ko'radi va o'ziga nusxa ola oladi.`
+    : `"${t.title||'Test'}" umumiydan chiqarilsinmi? Boshqa laoshilar ro'yxatida ko'rinmay qoladi.\n\nAvval nusxa olib qo'yganlarning nusxalari o'z joyida qoladi — ularga tegilmaydi.`;
+  if(!confirm(msg)) return;
+  db.ref('tests/'+id+'/shared').set(makeShared)
+    .then(()=> logEvent(makeShared ? 'test.share.on' : 'test.share.off', { testId:id, testTitle:t.title||'', ownerUid:t.ownerUid, ownerName:t.ownerName }))
+    .then(()=>{ if(typeof after === 'function') after(); });
+}
+function delAnnounce(id){
+  db.ref('announcements/'+id).once('value').then(snap=>{
+    const a = snap.val(); if(!a) return;
+    if(!confirm(`"${a.title}" e'loni korzinkaga o'tkazilsinmi?`)) return;
+    return trashPut('announce', a.authorUid, a.title, a, { targetId:id })
+      .then(()=> db.ref('announcements/'+id).remove())
+      .then(()=> logEvent('announce.delete', { targetId:id, targetName:a.title }))
+      .then(loadAnnounceList);
+  });
 }
 
 function renderCreate(){
@@ -889,8 +969,297 @@ function saveTest(){
     shared: !!(sharedEl && sharedEl.value==='1'),
     ownerUid: currentUser.uid, ownerName: currentUser.displayName || currentUser.email,
     createdAt: Date.now()
-  }).then(()=>{ curTestId = id; adminTab='tests'; setTab('tests');
+  }).then(()=> logEvent('test.create', { testId:id, testTitle:title, note:`${questions.length} savol · ${sharedEl&&sharedEl.value==='1'?'umumiy':'shaxsiy'}` }))
+    .then(()=>{ curTestId = id; adminTab='tests'; setTab('tests');
     alert('Test saqlandi! Havolani "Testlarim" bo\u2018limidan oling.'); });
+}
+
+
+/* ================= QAYDLAR (audit log) VA KORZINKA ================= */
+/* Har bir muhim amal `logs` tuguniga yoziladi: kim, qachon, nima qildi, qaysi test/o'quvchi ustida.
+   O'chirilgan narsalar esa yo'q qilinmasdan avval `trash/{egasiUid}` ga ko'chiriladi va tiklanishi mumkin. */
+
+const TRASH_TTL_DAYS = 90;   // korzinkadagi yozuv shuncha kundan keyin avtomatik o'chadi
+
+const LOG_LABELS = {
+  'test.create':        '📝 Test yaratdi',
+  'test.delete':        '🗑 Testni o‘chirdi',
+  'test.close':         '🔒 Testni yakunladi',
+  'test.open':          '🔓 Testni qayta ochdi',
+  'test.share.on':      '🌐 Testni umumiyga qo‘shdi',
+  'test.share.off':     '🚫 Testni umumiydan chiqardi',
+  'test.copy':          '📋 Umumiy testdan nusxa oldi',
+  'test.restore':       '♻️ Testni korzinkadan tikladi',
+  'session.reset':      '↺ O‘quvchiga testni qayta ochdi',
+  'session.approve':    '✓ Bloklangan o‘quvchiga ruxsat berdi',
+  'session.delete':     '🗑 O‘quvchi natijasini o‘chirdi',
+  'session.restore':    '♻️ O‘quvchi natijasini tikladi',
+  'teacher.create':     '➕ Yangi hisob ochdi',
+  'teacher.delete':     '🗑 Hisobni o‘chirdi',
+  'teacher.restore':    '♻️ Hisobni tikladi',
+  'teacher.restrict':   '⛔️ Hisobni chekladi',
+  'teacher.allow':      '✅ Cheklovni oldirdi',
+  'teacher.promote':    '⬆️ Administrator qildi',
+  'teacher.demote':     '⬇️ Laoshi qildi',
+  'teacher.pass.email': '📧 Parol reset havolasini yubordi',
+  'teacher.pass.force': '🔁 Parolni 111111 ga tikladi',
+  'announce.create':    '📢 E‘lon joyladi',
+  'announce.delete':    '🗑 E‘lonni o‘chirdi',
+  'announce.restore':   '♻️ E‘lonni tikladi',
+  'auth.login':         '🔑 Tizimga kirdi',
+  'auth.logout':        '🚪 Tizimdan chiqdi',
+  'auth.password':      '🔑 O‘z parolini almashtirdi',
+  'trash.purge':        '♨️ Korzinkadan butunlay o‘chirdi'
+};
+function logLabel(a){ return LOG_LABELS[a] || a; }
+
+function actorInfo(){
+  return {
+    actorUid:   currentUser ? currentUser.uid : '—',
+    actorName:  (currentProfile && currentProfile.name) || (currentUser && (currentUser.displayName || currentUser.email)) || '—',
+    actorEmail: (currentUser && currentUser.email) || '—',
+    actorRole:  (currentProfile && currentProfile.role) || 'teacher'
+  };
+}
+/* Jurnalga yozish. Qayd yozilmasa ham asosiy amal to'xtamaydi — shuning uchun xato faqat konsolga chiqadi. */
+function logEvent(action, info){
+  if(!db || !currentUser) return Promise.resolve();
+  const rec = Object.assign({ at: Date.now(), action }, actorInfo(), info || {});
+  Object.keys(rec).forEach(k=>{ if(rec[k] === undefined) delete rec[k]; });
+  return db.ref('logs').push(rec).catch(e=>{ console.warn('Qayd yozilmadi:', e); });
+}
+/* Korzinkaga solish. `ownerUid` — narsaning egasi (admin birovnikini o'chirsa ham egasida turadi). */
+function trashPut(kind, ownerUid, title, payload, extra){
+  const owner = ownerUid || (currentUser && currentUser.uid);
+  const rec = Object.assign({
+    at: Date.now(), kind, title: title || '',
+    ownerUid: owner,
+    byUid: currentUser.uid,
+    byName: actorInfo().actorName,
+    payload: payload || null
+  }, extra || {});
+  Object.keys(rec).forEach(k=>{ if(rec[k] === undefined) delete rec[k]; });
+  return db.ref('trash/'+owner).push(rec);
+}
+
+/* ---------- Korzinkani eskirgan yozuvlardan tozalash ---------- */
+function purgeOldTrash(){
+  const cutoff = Date.now() - TRASH_TTL_DAYS*24*60*60*1000;
+  const isAdmin = currentProfile && currentProfile.role === 'admin';
+  const ref = isAdmin ? db.ref('trash') : db.ref('trash/'+currentUser.uid);
+  ref.once('value').then(snap=>{
+    const val = snap.val(); if(!val) return;
+    const buckets = isAdmin ? val : { [currentUser.uid]: val };
+    const updates = {};
+    Object.entries(buckets).forEach(([owner, items])=>{
+      Object.entries(items || {}).forEach(([tid, rec])=>{
+        if((rec.at || 0) < cutoff) updates['trash/'+owner+'/'+tid] = null;
+      });
+    });
+    if(Object.keys(updates).length) db.ref().update(updates);
+  }).catch(e=> console.warn('Korzinkani tozalab bo‘lmadi:', e));
+}
+
+/* ================= 🧾 QAYDLAR BO'LIMI (faqat administrator) ================= */
+let logCache = [];
+function renderLogs(){
+  $('#tabBody').innerHTML = `
+    <div class="card">
+      <h2>🧾 Qaydlar jurnali</h2>
+      <p class="muted">Kim, qachon va nima qilgani — barcha laoshilar va administratorlar bo'yicha.
+      Eng yangi qaydlar yuqorida turadi.</p>
+      <div class="row" style="margin-top:12px">
+        <div><label>Qidiruv</label><input id="lg-q" placeholder="ism, test nomi, o'quvchi…" oninput="drawLogs()"></div>
+        <div><label>Amal turi</label><select id="lg-kind" onchange="drawLogs()">
+          <option value="">Hammasi</option>
+          <option value="test">Testlar</option>
+          <option value="session">O'quvchilar</option>
+          <option value="teacher">Hisoblar</option>
+          <option value="announce">E'lonlar</option>
+          <option value="auth">Kirish/chiqish</option>
+          <option value="trash">Korzinka</option>
+        </select></div>
+        <div><label>Davr</label><select id="lg-days" onchange="drawLogs()">
+          <option value="1">Bugun</option>
+          <option value="7">Oxirgi 7 kun</option>
+          <option value="30" selected>Oxirgi 30 kun</option>
+          <option value="0">Hammasi</option>
+        </select></div>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-ghost btn-sm" onclick="downloadLogs('json')">⬇ JSON yuklab olish</button>
+        <button class="btn-ghost btn-sm" onclick="downloadLogs('csv')">⬇ CSV (Excel)</button>
+        <button class="btn-ghost btn-sm" onclick="loadLogs()">↻ Yangilash</button>
+      </div>
+    </div>
+    <div class="card"><div id="lg-list"><p class="muted">Yuklanmoqda…</p></div></div>`;
+  loadLogs();
+}
+function loadLogs(){
+  db.ref('logs').limitToLast(1000).once('value').then(snap=>{
+    const val = snap.val() || {};
+    logCache = Object.entries(val).map(([id, r])=> Object.assign({ _id:id }, r))
+                     .sort((a,b)=>(b.at||0)-(a.at||0));
+    drawLogs();
+  }).catch(e=>{
+    $('#lg-list').innerHTML = `<div class="note red">Qaydlarni o'qib bo'lmadi: ${esc(e.message)}<br>
+      Bu odatda Firebase Database Rules'ga <b>logs</b> bo'limi qo'shilmaganini bildiradi — README'ga qarang.</div>`;
+  });
+}
+function filteredLogs(){
+  const q = ($('#lg-q') ? $('#lg-q').value : '').trim().toLowerCase();
+  const kind = $('#lg-kind') ? $('#lg-kind').value : '';
+  const days = $('#lg-days') ? +$('#lg-days').value : 0;
+  const cutoff = days ? Date.now() - days*24*60*60*1000 : 0;
+  return logCache.filter(r=>{
+    if(cutoff && (r.at||0) < cutoff) return false;
+    if(kind && String(r.action||'').split('.')[0] !== kind) return false;
+    if(q){
+      const hay = [r.actorName, r.actorEmail, r.testTitle, r.studentName, r.targetName, logLabel(r.action), r.note]
+                    .filter(Boolean).join(' ').toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+function logWhat(r){
+  const bits = [];
+  if(r.testTitle)    bits.push(`Test: <b>${esc(r.testTitle)}</b>`);
+  if(r.studentName)  bits.push(`O'quvchi: <b>${esc(r.studentName)}</b>`);
+  if(r.targetName && !r.testTitle && !r.studentName) bits.push(`<b>${esc(r.targetName)}</b>`);
+  if(r.ownerName && r.ownerUid && r.ownerUid !== r.actorUid) bits.push(`<span class="muted">egasi: ${esc(r.ownerName)}</span>`);
+  if(r.note)         bits.push(`<span class="muted">${esc(r.note)}</span>`);
+  return bits.join(' · ') || '<span class="muted">—</span>';
+}
+function drawLogs(){
+  const rows = filteredLogs();
+  const el = $('#lg-list'); if(!el) return;
+  el.innerHTML = !rows.length
+    ? `<p class="muted">Bu shartlarga mos qayd topilmadi.</p>`
+    : `<p class="muted" style="margin-bottom:10px">${rows.length} ta qayd</p>
+       <div style="overflow-x:auto"><table>
+       <tr><th>Vaqt</th><th>Kim</th><th>Amal</th><th>Nima ustida</th></tr>
+       ${rows.map(r=>`<tr>
+         <td style="white-space:nowrap">${new Date(r.at||0).toLocaleString('uz-UZ',{dateStyle:'short',timeStyle:'short'})}</td>
+         <td><b>${esc(r.actorName||'—')}</b>${r.actorRole==='admin'?' <span class="pill p-blue">admin</span>':''}
+             <br><span class="muted">${esc(r.actorEmail||'')}</span></td>
+         <td style="white-space:nowrap">${esc(logLabel(r.action))}</td>
+         <td>${logWhat(r)}</td>
+       </tr>`).join('')}</table></div>`;
+}
+function downloadFile(name, text, mime){
+  const blob = new Blob([text], {type: mime});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 0);
+}
+function csvCell(v){ return '"' + String(v==null?'':v).replace(/"/g,'""') + '"'; }
+function downloadLogs(fmt){
+  const rows = filteredLogs();
+  if(!rows.length) return alert('Yuklab olishga qayd yo‘q.');
+  const stamp = new Date().toISOString().slice(0,10);
+  if(fmt === 'json'){
+    downloadFile(`laoshi-qaydlar-${stamp}.json`, JSON.stringify(rows, null, 2), 'application/json');
+  } else {
+    const head = ['Vaqt','Kim','Email','Rol','Amal kodi','Amal','Test','O‘quvchi','Nishon','Egasi','Izoh'];
+    const body = rows.map(r=>[
+      new Date(r.at||0).toLocaleString('uz-UZ'), r.actorName, r.actorEmail, r.actorRole,
+      r.action, logLabel(r.action).replace(/^\S+\s/,''), r.testTitle, r.studentName, r.targetName, r.ownerName, r.note
+    ].map(csvCell).join(','));
+    downloadFile(`laoshi-qaydlar-${stamp}.csv`, '﻿' + [head.map(csvCell).join(',')].concat(body).join('\r\n'), 'text/csv;charset=utf-8');
+  }
+}
+
+/* ================= 🗑 KORZINKA ================= */
+let trashCache = [];
+function renderTrash(){
+  const isAdmin = currentProfile.role === 'admin';
+  $('#tabBody').innerHTML = `
+    <div class="card">
+      <h2>🗑 Korzinka</h2>
+      <p class="muted">O'chirilgan testlar, o'quvchi natijalari${isAdmin?", hisoblar va e'lonlar":''} shu yerda saqlanadi va
+      tiklanishi mumkin. ${TRASH_TTL_DAYS} kundan eski yozuvlar avtomatik o'chadi.
+      ${isAdmin?'':'<br>Siz faqat o‘zingizga tegishli yozuvlarni ko‘rasiz.'}</p>
+      <div style="margin-top:12px"><button class="btn-ghost btn-sm" onclick="loadTrash()">↻ Yangilash</button></div>
+    </div>
+    <div class="card"><div id="tr-list"><p class="muted">Yuklanmoqda…</p></div></div>`;
+  loadTrash();
+}
+function loadTrash(){
+  const isAdmin = currentProfile.role === 'admin';
+  const ref = isAdmin ? db.ref('trash') : db.ref('trash/'+currentUser.uid);
+  ref.once('value').then(snap=>{
+    const val = snap.val() || {};
+    const buckets = isAdmin ? val : { [currentUser.uid]: val };
+    trashCache = [];
+    Object.entries(buckets).forEach(([owner, items])=>{
+      Object.entries(items || {}).forEach(([tid, rec])=> trashCache.push(Object.assign({_id:tid, _owner:owner}, rec)));
+    });
+    trashCache.sort((a,b)=>(b.at||0)-(a.at||0));
+    drawTrash();
+  }).catch(e=>{
+    $('#tr-list').innerHTML = `<div class="note red">Korzinkani o'qib bo'lmadi: ${esc(e.message)}<br>
+      Firebase Database Rules'ga <b>trash</b> bo'limi qo'shilganini tekshiring — README'ga qarang.</div>`;
+  });
+}
+const TRASH_KIND = { test:'📚 Test', session:'👤 O‘quvchi natijasi', teacher:'👥 Hisob', announce:'📢 E‘lon' };
+function drawTrash(){
+  const el = $('#tr-list'); if(!el) return;
+  el.innerHTML = !trashCache.length
+    ? `<p class="muted">Korzinka bo'sh.</p>`
+    : trashCache.map(r=>{
+        const days = Math.max(0, TRASH_TTL_DAYS - Math.floor((Date.now()-(r.at||0))/86400000));
+        return `<div class="card" style="background:var(--paper);margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;align-items:flex-start">
+            <div>
+              <h3>${esc(r.title || '(nomsiz)')} <span class="pill p-gray" style="margin-left:6px">${TRASH_KIND[r.kind]||r.kind}</span></h3>
+              <p class="muted">O'chirgan: <b>${esc(r.byName||'—')}</b> ·
+              ${new Date(r.at||0).toLocaleString('uz-UZ',{dateStyle:'medium',timeStyle:'short'})} ·
+              ${days} kundan keyin butunlay o'chadi</p>
+              ${r.note ? `<p class="muted">${esc(r.note)}</p>` : ''}
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn-jade btn-sm" onclick="restoreTrash('${r._owner}','${r._id}')">♻️ Tiklash</button>
+              <button class="btn-ghost btn-sm" onclick="purgeTrash('${r._owner}','${r._id}')">Butunlay o'chirish</button>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+}
+function trashRec(owner, id){ return trashCache.find(r=> r._owner===owner && r._id===id); }
+function restoreTrash(owner, id){
+  const r = trashRec(owner, id); if(!r) return;
+  if(!confirm(`"${r.title}" tiklansinmi?`)) return;
+  const p = r.payload || {};
+  let job, ev;
+  if(r.kind === 'test'){
+    const updates = { ['tests/'+r.testId]: p.test || null };
+    if(p.sessions) updates['sessions/'+r.testId] = p.sessions;
+    job = db.ref().update(updates);
+    ev = ['test.restore', { testId:r.testId, testTitle:r.title, ownerUid:r.ownerUid, ownerName:(p.test&&p.test.ownerName)||'' }];
+  } else if(r.kind === 'session'){
+    job = db.ref('sessions/'+r.testId+'/'+r.sessionId).set(p);
+    ev = ['session.restore', { testId:r.testId, testTitle:r.testTitle, studentName:r.title }];
+  } else if(r.kind === 'teacher'){
+    job = db.ref('teachers/'+r.targetUid).set(p);
+    ev = ['teacher.restore', { targetId:r.targetUid, targetName:r.title }];
+  } else if(r.kind === 'announce'){
+    job = db.ref('announcements/'+r.targetId).set(p);
+    ev = ['announce.restore', { targetId:r.targetId, targetName:r.title }];
+  } else { return alert('Bu turdagi yozuvni tiklab bo‘lmaydi.'); }
+  job.then(()=> db.ref('trash/'+owner+'/'+id).remove())
+     .then(()=> logEvent(ev[0], ev[1]))
+     .then(()=>{ alert('✅ Tiklandi.'); loadTrash(); })
+     .catch(e=> alert('Tiklab bo‘lmadi: ' + e.message));
+}
+function purgeTrash(owner, id){
+  const r = trashRec(owner, id); if(!r) return;
+  if(!confirm(`"${r.title}" butunlay o'chirilsinmi? Bu amalni orqaga qaytarib bo'lmaydi.`)) return;
+  db.ref('trash/'+owner+'/'+id).remove()
+    .then(()=> logEvent('trash.purge', { targetName:r.title, note:(TRASH_KIND[r.kind]||r.kind) }))
+    .then(()=>{ loadTrash(); })
+    .catch(e=> alert('O‘chirib bo‘lmadi: ' + e.message));
 }
 
 /* ---------- LIVE DASHBOARD ---------- */
@@ -966,7 +1335,7 @@ function drawDash(){
         <td style="white-space:nowrap">
           ${s.status==='locked' ? `<button class="btn-jade btn-sm" onclick="approve('${sid}')">✓ Ruxsat</button>` : ''}
           <button class="btn-ghost btn-sm" onclick="resetStudent('${sid}')">↺</button>
-          <button class="btn-ghost btn-sm" onclick="if(confirm('O\u2018chirilsinmi?'))db.ref('sessions/${curTestId}/${sid}').remove()">🗑</button>
+          <button class="btn-ghost btn-sm" onclick="delSession('${sid}')">🗑</button>
         </td></tr>`;
     }).join('')}</table></div>`;
 
@@ -986,10 +1355,29 @@ function drawDash(){
           <td><div class="bar"><i style="width:${pc}%;background:${pc>=50?'var(--red)':pc>=25?'var(--amber)':'var(--jade)'}"></i></div></td></tr>`;
       }).join('') + `</table>`;
 }
-function approve(sid){ db.ref(`sessions/${curTestId}/${sid}`).update({status:'approved'}); }
+function curTestMeta(){ return dashTestsSource()[curTestId] || {}; }
+function approve(sid){
+  const s = curSessions[sid] || {}; const t = curTestMeta();
+  db.ref(`sessions/${curTestId}/${sid}`).update({status:'approved'})
+    .then(()=> logEvent('session.approve', { testId:curTestId, testTitle:t.title, studentName:s.name, ownerUid:t.ownerUid, ownerName:t.ownerName }));
+}
 function resetStudent(sid){
   if(!confirm("O'quvchi testni boshidan boshlaydi. Davom etilsinmi?")) return;
-  db.ref(`sessions/${curTestId}/${sid}`).update({status:'reset', answers:null, violations:0, correct:null, percent:null, grade:null, timeout:null});
+  const s = curSessions[sid] || {}; const t = curTestMeta();
+  db.ref(`sessions/${curTestId}/${sid}`).update({status:'reset', answers:null, violations:0, correct:null, percent:null, grade:null, timeout:null})
+    .then(()=> logEvent('session.reset', { testId:curTestId, testTitle:t.title, studentName:s.name, ownerUid:t.ownerUid, ownerName:t.ownerName,
+      note: s.status==='finished' ? `oldingi natija: ${s.percent}%` : `oldingi holat: ${s.status||'—'}` }));
+}
+/* O'quvchi natijasi ham korzinkaga tushadi — xato bosilsa tiklab bo'ladi. */
+function delSession(sid){
+  const s = curSessions[sid]; if(!s) return;
+  const t = curTestMeta();
+  if(!confirm(`${s.name} ning natijasi korzinkaga o'tkazilsinmi?`)) return;
+  trashPut('session', t.ownerUid, s.name, s, { testId:curTestId, sessionId:sid, testTitle:t.title,
+      note: s.status==='finished' ? `${t.title||''} · ${s.percent}%` : (t.title||'') })
+    .then(()=> db.ref(`sessions/${curTestId}/${sid}`).remove())
+    .then(()=> logEvent('session.delete', { testId:curTestId, testTitle:t.title, studentName:s.name, ownerUid:t.ownerUid, ownerName:t.ownerName }))
+    .catch(e=> alert("O'chirib bo'lmadi: " + e.message));
 }
 function showDetail(sid){
   const t = dashTestsSource()[curTestId], s = curSessions[sid]; if(!t||!s) return;

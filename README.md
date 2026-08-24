@@ -167,6 +167,100 @@ tugma "sozlanmagan" deb xabar beradi.
 - `config.js` ichidagi `window.APPS_SCRIPT_URL` qatoriga 2-qadamdagi Web app URL'ni qo'ying, saqlang va GitHub'ga qayta yuklang (yoki push qiling)
 - Tayyor — endi admin panelida "🔁 111111ga tiklash" tugmasi ishlaydi
 
+## 3.6 Qaydlar jurnali va korzinka
+
+### 🧾 Qaydlar (faqat administrator)
+
+Admin panelidagi **🧾 Qaydlar** bo'limida kim, qachon va nima qilgani yozib boriladi — barcha
+laoshilar va administratorlar bo'yicha. Har bir qaydda: vaqt, kimning ismi va emaili, amal turi,
+qaysi test yoki qaysi o'quvchi ustida bajarilgani.
+
+Yoziladigan amallar: test yaratish/o'chirish/yakunlash/qayta ochish, umumiyga qo'shish va undan
+chiqarish, umumiy testdan nusxa olish, o'quvchiga testni qayta ochish, bloklangan o'quvchiga ruxsat
+berish, natijani o'chirish, hisob ochish/o'chirish/cheklash, rol o'zgartirish, parol resetlari,
+e'lonlar, kirish va chiqish, korzinkadan tiklash va butunlay o'chirish.
+
+Yuqoridagi maydonlar orqali ism/test nomi bo'yicha qidirish, amal turi va davr bo'yicha saralash
+mumkin. **⬇ JSON** va **⬇ CSV (Excel)** tugmalari o'sha paytdagi saralangan ro'yxatni yuklab beradi —
+JSON arxiv uchun, CSV esa Excel'da ochish uchun qulay.
+
+Laoshilar bu bo'limni umuman ko'rmaydi.
+
+### 🗑 Korzinka
+
+O'chirilgan narsalar darhol yo'q bo'lmaydi — avval korzinkaga tushadi:
+
+| Nima | Kim ko'radi | Tiklanganda |
+|---|---|---|
+| Test | egasi va administrator | test **va uning barcha natijalari** qaytadi |
+| O'quvchi natijasi | test egasi va administrator | o'sha natija o'z testiga qaytadi |
+| Hisob (laoshi) | administrator | profil qaytadi, hisob yana kira oladi |
+| E'lon | administrator | e'lon ro'yxatga qaytadi |
+
+Yozuvlar **90 kun** saqlanadi, keyin avtomatik o'chadi (panel ochilganda tekshiriladi). Kutmasdan
+yo'q qilish uchun har bir qator yonida **"Butunlay o'chirish"** tugmasi bor — u orqaga qaytmaydi.
+
+Bitta muhim cheklov: hisob o'chirilganda uning **Firebase Authentication** yozuvi joyida qoladi
+(brauzerdan boshqa birovning auth hisobini o'chirib bo'lmaydi). Ya'ni hisob tizimga kira olmay
+qoladi, lekin o'sha email band bo'lib turadi va u bilan yangi hisob ocholmaysiz — kerak bo'lsa
+korzinkadan tiklaysiz, yoki Firebase Console → Authentication bo'limidan qo'lda o'chirasiz.
+
+### Admin uchun test boshqaruvi
+
+- **Testlarim** ro'yxatida administrator har qanday testni umumiyga qo'sha oladi yoki
+  **🚫 Umumiydan chiqarish** bilan umumiylikdan olib tashlay oladi. Chiqarilganda boshqa laoshilar
+  ro'yxatida ko'rinmay qoladi, lekin **avval nusxa olib qo'yganlarning nusxalariga tegilmaydi** —
+  nusxa alohida test, u o'z egasida qolaveradi.
+- **👥 Laoshilar → 📚 Testlari** ichida administrator har bir testni yakunlashi, qayta ochishi,
+  umumiylikka qo'shishi/chiqarishi va korzinkaga o'chirishi mumkin.
+
+### Yangi Database Rules — bularsiz ishlamaydi
+
+`logs` va `trash` uchun qoida qo'shilmasa, bo'limlar "o'qib bo'lmadi" deb xato beradi. Realtime
+Database → **Rules** ga quyidagi ikkita blokni qo'shing (mavjud `tests`, `sessions`, `teachers`
+bloklaringiz yoniga):
+
+```json
+"logs": {
+  ".read": "root.child('teachers').child(auth.uid).child('role').val() === 'admin'",
+  ".indexOn": ["at"],
+  "$logId": {
+    ".write": "auth != null && (!data.exists() || root.child('teachers').child(auth.uid).child('role').val() === 'admin')"
+  }
+},
+"trash": {
+  ".read": "root.child('teachers').child(auth.uid).child('role').val() === 'admin'",
+  "$owner": {
+    ".read": "auth != null && auth.uid === $owner",
+    ".write": "auth != null && (auth.uid === $owner || root.child('teachers').child(auth.uid).child('role').val() === 'admin')"
+  }
+}
+```
+
+Jurnal **qo'shishga ochiq, o'zgartirishga yopiq**: har kim yangi qayd yoza oladi, lekin yozilganini
+tahrirlash yoki o'chirishni faqat administrator qila oladi. Shuning uchun laoshi o'z izini
+yashira olmaydi.
+
+Bundan tashqari, administrator boshqa laoshining testini boshqarishi va natijalarini ko'rishi uchun
+mavjud `tests` va `sessions` qoidalariga administrator sharti qo'shilishi kerak:
+
+```json
+"tests": {
+  ".read": true,
+  ".indexOn": ["ownerUid", "shared", "sourceTestId"],
+  "$testId": {
+    ".write": "auth != null && root.child('teachers').child(auth.uid).child('active').val() !== false && (!data.exists() || data.child('ownerUid').val() === auth.uid || root.child('teachers').child(auth.uid).child('role').val() === 'admin')"
+  }
+},
+"sessions": {
+  "$testId": {
+    ".read": "auth != null && root.child('teachers').child(auth.uid).child('active').val() !== false && (root.child('tests').child($testId).child('ownerUid').val() === auth.uid || root.child('teachers').child(auth.uid).child('role').val() === 'admin')",
+    ".write": "auth != null && root.child('teachers').child(auth.uid).child('role').val() === 'admin'",
+    "$sid": { ".write": true }
+  }
+}
+```
+
 ## 4. Ishlatish
 
 ### Test yaratish formati
