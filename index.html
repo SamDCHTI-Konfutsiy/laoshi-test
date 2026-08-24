@@ -122,6 +122,143 @@ tr:hover td{background:#FAFAF7}
 .stat span{font-size:12px;color:var(--ink-soft);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px}
 footer{margin-top:40px;text-align:center;color:var(--ink-soft);font-size:12.5px}
+
+/* ============================================================
+   UI 2.0 — qatorlar, menyular, yopishqoq sarlavha, mobil tartib
+   (Yuqoridagi uslublar saqlanadi; bu qatlam ularni yaxshilaydi)
+   ============================================================ */
+:root{
+  --r-sm:8px; --r:12px; --r-lg:16px;
+  --shadow:0 1px 2px rgba(33,42,51,.04), 0 4px 14px rgba(33,42,51,.06);
+  --shadow-pop:0 8px 28px rgba(33,42,51,.16);
+  --focus:0 0 0 3px rgba(61,107,142,.25);
+}
+body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+.wrap{max-width:1140px}
+
+/* --- yopishqoq sarlavha --- */
+.brand.topbar{
+  position:sticky;top:0;z-index:60;margin:-24px -16px 20px;padding:14px 16px;
+  background:rgba(246,245,241,.88);backdrop-filter:saturate(1.6) blur(10px);
+  border-bottom:1px solid var(--line);gap:14px
+}
+.brand.topbar h1{font-size:20px;line-height:1.25}
+.brand.topbar .seal{width:38px;height:38px;font-size:21px}
+
+/* --- tablar: mobilda gorizontal siljiydi --- */
+.tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:4px;
+  -webkit-overflow-scrolling:touch;margin-bottom:20px}
+.tabs::-webkit-scrollbar{display:none}
+.tabs-wrap{position:relative}
+.tabs-wrap::after{content:'';position:absolute;right:0;top:0;bottom:6px;width:36px;pointer-events:none;
+  background:linear-gradient(90deg,rgba(246,245,241,0),var(--paper))}
+.tab{white-space:nowrap;flex:none;transition:background .15s,color .15s,border-color .15s}
+.tab:hover:not(.on){border-color:var(--ink-soft);color:var(--ink)}
+.tab-sep{flex:none;width:1px;align-self:stretch;background:var(--line);margin:4px 6px}
+
+/* --- kartochka --- */
+.card{padding:20px 22px;border-radius:var(--r-lg)}
+.card h2{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.card+.card{margin-top:0}
+@media(max-width:640px){ .card{padding:16px 14px;border-radius:var(--r)} }
+
+/* --- ro'yxat qatori: sarlavha + izoh + amallar --- */
+.lrow{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:14px 16px;margin-bottom:10px;transition:border-color .15s,box-shadow .15s
+}
+.lrow:hover{border-color:#D3D0C7;box-shadow:var(--shadow)}
+.lrow-main{min-width:220px;flex:1}
+.lrow-title{font-family:var(--serif);font-weight:700;font-size:16px;line-height:1.35;
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.lrow-sub{color:var(--ink-soft);font-size:13.5px;margin-top:3px}
+.lrow-act{display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex:none}
+@media(max-width:640px){
+  .lrow{padding:13px 13px}
+  .lrow-act{width:100%}
+  .lrow-act .btn-sm{flex:1;min-width:auto}
+  .lrow-act .menu{flex:none}
+}
+
+/* --- "⋯" menyu --- */
+.menu{position:relative;display:inline-block}
+.menu-btn{min-width:38px;font-size:17px;line-height:1;padding:6px 10px;letter-spacing:1px}
+.menu-pop{
+  position:absolute;right:0;top:calc(100% + 6px);z-index:70;min-width:214px;
+  background:#fff;border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:var(--shadow-pop);padding:6px;display:flex;flex-direction:column
+}
+.menu-item{
+  background:transparent;border:none;text-align:left;padding:9px 11px;border-radius:var(--r-sm);
+  font-size:13.5px;font-weight:500;color:var(--ink);width:100%;white-space:nowrap
+}
+.menu-item:hover{background:#F2F4F6}
+.menu-item.danger{color:var(--red)}
+.menu-item.danger:hover{background:var(--red-soft)}
+@media(max-width:640px){ .menu-pop{right:auto;left:0} }
+
+/* --- tugmalar --- */
+button{transition:background .15s,border-color .15s,color .15s,transform .06s}
+button:active{transform:translateY(1px)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
+  outline:none;box-shadow:var(--focus)}
+.btn-ghost{background:#fff}
+.btn-ghost:hover{border-color:var(--ink-soft);background:#FBFBF9}
+
+/* --- maydonlar --- */
+input,textarea,select{transition:border-color .15s,box-shadow .15s}
+input:focus,textarea:focus,select:focus{box-shadow:var(--focus)}
+input[type=file]{padding:9px 11px;background:#FBFBF9;font-size:13.5px}
+input[type=radio],input[type=checkbox]{box-shadow:none}
+label{margin-top:16px}
+.card>label:first-child{margin-top:0}
+
+/* --- jadval --- */
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:#fff}
+.tbl table{font-size:13.5px}
+.tbl th{position:sticky;top:0;background:#FBFBF9;z-index:1}
+.tbl tr:last-child td{border-bottom:none}
+td,th{padding:11px 12px}
+tr:hover td{background:#FAFAF7}
+
+/* --- bo'sh holat --- */
+.empty{text-align:center;padding:34px 18px;color:var(--ink-soft)}
+.empty .ico{font-size:34px;display:block;margin-bottom:8px;opacity:.75}
+
+/* --- statistika --- */
+.stat{border-radius:var(--r);padding:16px 14px}
+.stat b{font-size:28px}
+
+/* --- pill va kod --- */
+.pill{padding:3px 9px;font-size:11.5px;letter-spacing:.01em}
+.code{font-size:12.5px}
+
+/* --- eslatma --- */
+.note{border-radius:var(--r);line-height:1.5}
+
+/* --- modal --- */
+.modal{border-radius:var(--r-lg);box-shadow:var(--shadow-pop)}
+@media(max-width:640px){ .modal{padding:18px 16px;max-height:92vh} }
+
+/* --- havola qatori --- */
+.linkbox{flex-wrap:wrap}
+.linkbox input{min-width:180px;flex:1}
+
+/* --- mobil sarlavha --- */
+@media(max-width:640px){
+  .brand.topbar{flex-wrap:wrap;gap:10px;padding:12px 12px;margin:-16px -10px 16px}
+  .brand.topbar h1{font-size:17px}
+  .brand.topbar small{font-size:11.5px;line-height:1.35}
+  .brand.topbar .seal{width:34px;height:34px;font-size:19px}
+  .brand.topbar>div:last-child{width:100%;justify-content:stretch;gap:8px}
+  .brand.topbar>div:last-child .btn-sm{flex:1;font-size:12.5px;padding:8px 6px}
+  .tabs-wrap::after{width:24px}
+}
+
+@media (prefers-reduced-motion: reduce){
+  *{transition:none!important;animation:none!important}
+}
 </style>
 </head>
 <body>
@@ -145,6 +282,11 @@ const FIREBASE_CONFIG = window.FIREBASE_CONFIG || {};
 // Bo'sh qoldirilsa, tugma buni tushuntirib xato ko'rsatadi (sayt boshqa hamma joyda odatdagidek ishlayveradi).
 const APPS_SCRIPT_URL = window.APPS_SCRIPT_URL || '';
 
+const p2_ = n => String(n).padStart(2,'0');
+/* Sana formati qo'lda: brauzer "uz-UZ" uchun "2026 M08 24" kabi g'alati ko'rinish beradi. */
+function fmtD(ms){ if(!ms) return '—'; const d = new Date(ms); return `${p2_(d.getDate())}.${p2_(d.getMonth()+1)}.${d.getFullYear()}`; }
+function fmtHM(ms){ if(!ms) return '—'; const d = new Date(ms); return `${p2_(d.getHours())}:${p2_(d.getMinutes())}`; }
+function fmtDT(ms){ if(!ms) return '—'; return fmtD(ms) + ' · ' + fmtHM(ms); }
 const $ = s => document.querySelector(s);
 const app = $('#app');
 const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -473,8 +615,8 @@ function renderAdmin(){
   const name = currentProfile.name || currentUser.email;
   const isAdmin = currentProfile.role === 'admin';
   app.innerHTML = `
-  <div class="brand" style="justify-content:space-between">
-    <div style="display:flex;align-items:center;gap:12px">
+  <div class="brand topbar" style="justify-content:space-between">
+    <div style="display:flex;align-items:center;gap:12px;min-width:0">
       <div class="seal">考</div><div><h1>Laoshi paneli</h1>
       <small>${esc(name)} · ${esc(currentUser.email)} ${isAdmin?'<span class="pill p-blue" style="margin-left:6px">Administrator</span>':''}</small></div>
     </div>
@@ -484,15 +626,17 @@ function renderAdmin(){
     </div>
   </div>
   <div id="announceBanner"></div>
-  <div class="tabs">
+  <div class="tabs-wrap"><div class="tabs">
     <div class="tab ${adminTab==='tests'?'on':''}" data-tab="tests" onclick="setTab('tests')">📚 Testlarim</div>
     <div class="tab ${adminTab==='create'?'on':''}" data-tab="create" onclick="startNewTest()">➕ Yangi test</div>
     <div class="tab ${adminTab==='dash'?'on':''}" data-tab="dash" onclick="setTab('dash')">📊 Jonli natijalar</div>
     ${isAdmin ? `<div class="tab ${adminTab==='teachers'?'on':''}" data-tab="teachers" onclick="setTab('teachers')">👥 Laoshilar</div>` : ''}
     ${isAdmin ? `<div class="tab ${adminTab==='announce'?'on':''}" data-tab="announce" onclick="setTab('announce')">📢 E'lonlar</div>` : ''}
+    ${isAdmin ? `<div class="tab ${adminTab==='alltests'?'on':''}" data-tab="alltests" onclick="setTab('alltests')">📋 Barcha testlar</div>` : ''}
     ${isAdmin ? `<div class="tab ${adminTab==='logs'?'on':''}" data-tab="logs" onclick="setTab('logs')">🧾 Qaydlar</div>` : ''}
     <div class="tab ${adminTab==='trash'?'on':''}" data-tab="trash" onclick="setTab('trash')">🗑 Korzinka</div>
-  </div>
+    <div class="tab ${adminTab==='logins'?'on':''}" data-tab="logins" onclick="setTab('logins')">🔐 Kirishlarim</div>
+  </div></div>
   <div id="tabBody"></div>`;
   if(testsListenerRef) testsListenerRef.off();
   testsListenerRef = db.ref('tests').orderByChild('ownerUid').equalTo(uid);
@@ -509,7 +653,7 @@ function renderAdmin(){
   if(announceListenerRef) announceListenerRef.off();
   announceListenerRef = db.ref('announcements').limitToLast(3);
   announceListenerRef.on('value', snap=> renderAnnounceBanner(snap.val()||{}));
-  if(!window.__sessionLogged){ window.__sessionLogged = true; logEvent('auth.login'); purgeOldTrash(); }
+  if(!window.__sessionLogged){ window.__sessionLogged = true; recordLogin(); purgeOldTrash(); }
   setTab(adminTab);
 }
 function dashTestsSource(){ return currentProfile.role==='admin' ? allTests : tests; }
@@ -519,11 +663,11 @@ function renderAnnounceBanner(items){
   el.innerHTML = !rows.length ? '' : rows.map(a=>`
     <div class="note" style="background:var(--blue-soft);border-color:#C7D9E6">
       <b>📢 ${esc(a.title)}</b><br>${esc(a.body)}
-      <div class="muted" style="margin-top:4px">${esc(a.authorName||'')} · ${new Date(a.createdAt).toLocaleDateString('uz-UZ',{dateStyle:'medium'})}</div>
+      <div class="muted" style="margin-top:4px">${esc(a.authorName||'')} · ${fmtD(a.createdAt)}</div>
     </div>`).join('');
 }
 function setTab(t){
-  if((t==='teachers'||t==='announce'||t==='logs') && currentProfile.role!=='admin') t = 'tests';
+  if((t==='teachers'||t==='announce'||t==='logs'||t==='alltests') && currentProfile.role!=='admin') t = 'tests';
   adminTab = t;
   document.querySelectorAll('.tab').forEach(el=>el.classList.toggle('on', el.dataset.tab===t));
   if(t==='tests') renderTestList();
@@ -533,6 +677,8 @@ function setTab(t){
   if(t==='announce') renderAnnounce();
   if(t==='logs') renderLogs();
   if(t==='trash') renderTrash();
+  if(t==='alltests') renderAllTests();
+  if(t==='logins') renderLogins();
 }
 function renderAnnounce(){
   $('#tabBody').innerHTML = `
@@ -567,7 +713,7 @@ function loadAnnounceList(){
       rows.map(([id,a])=>`<div class="q-card">
         <div style="display:flex;justify-content:space-between;gap:10px">
           <div><b>${esc(a.title)}</b><p class="muted">${esc(a.body)}</p>
-          <p class="muted">${esc(a.authorName||'')} · ${new Date(a.createdAt).toLocaleString('uz-UZ',{dateStyle:'medium',timeStyle:'short'})}</p></div>
+          <p class="muted">${esc(a.authorName||'')} · ${fmtDT(a.createdAt)}</p></div>
           <button class="btn-ghost btn-sm" onclick="delAnnounce('${id}')">🗑</button>
         </div></div>`).join('');
   });
@@ -631,31 +777,31 @@ function loadTeachersList(){
     window.__teachersCache = teachers;
     window.__teacherTestsCache = byOwner;
     const rows = Object.entries(teachers).sort((a,b)=>(a[1].name||'').localeCompare(b[1].name||''));
-    $('#t-list').innerHTML = !rows.length ? `<div class="card"><p class="muted">Hozircha hech kim yo'q.</p></div>` :
+    $('#t-list').innerHTML = !rows.length ? `<div class="empty"><span class="ico">👥</span>Hozircha hech kim yo'q.</div>` :
       rows.map(([tuid,t])=>{
         const count = (byOwner[tuid]||[]).length;
         const isSelf = tuid === currentUser.uid;
-        return `<div class="card">
-          <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;align-items:flex-start">
-            <div>
-              <h3>${esc(t.name)}
-                ${t.role==='admin' ? '<span class="pill p-blue" style="margin-left:6px">Administrator</span>' : ''}
-                ${t.active===false ? '<span class="pill p-red" style="margin-left:6px">Cheklangan</span>' : '<span class="pill p-green" style="margin-left:6px">Faol</span>'}
-                ${isSelf ? '<span class="pill p-gray" style="margin-left:6px">Siz</span>' : ''}
-              </h3>
-              <p class="muted">${esc(t.email)} · ${count} ta test</p>
+        return `<div class="lrow">
+          <div class="lrow-main">
+            <div class="lrow-title">${esc(t.name)}
+              ${t.role==='admin' ? '<span class="pill p-blue">Administrator</span>' : ''}
+              ${t.active===false ? '<span class="pill p-red">Cheklangan</span>' : '<span class="pill p-green">Faol</span>'}
+              ${isSelf ? '<span class="pill p-gray">Siz</span>' : ''}
             </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
-              ${count>0 ? `<button class="btn-ghost btn-sm" onclick="toggleTeacherTests('${tuid}')">📚 Testlari</button>` : ''}
-              ${!isSelf ? `<button class="btn-ghost btn-sm" onclick="adminResetTeacherPass('${tuid}')">📧 Reset havola yuborish</button>` : ''}
-              ${!isSelf ? `<button class="btn-ghost btn-sm" onclick="adminForcePasswordReset('${tuid}')">🔁 111111ga tiklash</button>` : ''}
-              ${(t.role!=='admin') ? `<button class="btn-ghost btn-sm" onclick="promoteToAdmin('${tuid}')">⬆️ Administrator qilish</button>` : ''}
-              ${(t.role==='admin' && !isSelf) ? `<button class="btn-ghost btn-sm" onclick="demoteToTeacher('${tuid}')">⬇️ Laoshi qilish</button>` : ''}
-              ${(t.role!=='admin') ? `<button class="btn-ghost btn-sm" onclick="toggleTeacherActive('${tuid}', ${t.active===false})">${t.active===false?'Ruxsat berish':'Cheklash'}</button>` : ''}
-              ${(!isSelf && t.role!=='admin') ? `<button class="btn-ghost btn-sm" onclick="adminDeleteTeacher('${tuid}')">🗑 Hisobni o'chirish</button>` : ''}
-            </div>
+            <div class="lrow-sub">${esc(t.email)} · ${count} ta test</div>
           </div>
-          <div id="tt-${tuid}" class="hidden" style="margin-top:12px"></div>
+          <div class="lrow-act">
+            ${count>0 ? `<button class="btn-ghost btn-sm" onclick="toggleTeacherTests('${tuid}')">📚 Testlari</button>` : ''}
+            ${(t.role!=='admin') ? `<button class="btn-ghost btn-sm" onclick="toggleTeacherActive('${tuid}', ${t.active===false})">${t.active===false?'✅ Ruxsat berish':'⛔️ Cheklash'}</button>` : ''}
+            ${menuHtml('tm-'+tuid, [
+              !isSelf && {label:'📧 Reset havola yuborish', fn:`adminResetTeacherPass('${tuid}')`},
+              !isSelf && {label:'🔁 Parolni 111111 ga tiklash', fn:`adminForcePasswordReset('${tuid}')`},
+              (t.role!=='admin') && {label:'⬆️ Administrator qilish', fn:`promoteToAdmin('${tuid}')`},
+              (t.role==='admin' && !isSelf) && {label:'⬇️ Laoshi qilish', fn:`demoteToTeacher('${tuid}')`},
+              (!isSelf && t.role!=='admin') && {label:'🗑 Hisobni o‘chirish', fn:`adminDeleteTeacher('${tuid}')`, danger:true}
+            ])}
+          </div>
+          <div id="tt-${tuid}" class="hidden" style="width:100%;margin-top:12px"></div>
         </div>`;
       }).join('');
   });
@@ -681,21 +827,24 @@ function toggleTeacherTests(tuid){
   const list = ((window.__teacherTestsCache||{})[tuid] || []).slice().sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
   el.innerHTML = !list.length ? `<p class="muted">Testlari yo'q.</p>` : list.map(t=>{
     const link = location.origin + location.pathname + '?t=' + t.id;
-    return `<div class="card" style="background:var(--paper);margin-bottom:10px">
-      <h3>${esc(t.title)}</h3>
-      <p class="muted">${t.questions.length} savol · ${t.timeLimit} daqiqa · ${t.attemptLimit||1} urinish
-        ${t.shared ? '· <span class="pill p-blue">🌐 Umumiy</span>' : ''}${t.closed ? ' · <span class="pill p-red">🔒 Yopiq</span>' : ''}</p>
-      <div class="linkbox">
-        <input readonly value="${link}" onclick="this.select()">
-        <button class="btn-p btn-sm" onclick="navigator.clipboard.writeText('${link}');this.textContent='✓'">Nusxa</button>
-        <button class="btn-ghost btn-sm" onclick="toggleQR(this,'${link}')">QR</button>
-        <button class="btn-jade btn-sm" onclick="curTestId='${t.id}';setTab('dash')">📊 Natijalar</button>
-        <button class="btn-ghost btn-sm" onclick="editTest('${t.id}')">✏️ Tahrirlash</button>
-        <button class="btn-ghost btn-sm" onclick="toggleTestClosed('${t.id}', ${!t.closed}, loadTeachersList)">${t.closed ? '🔓 Qayta ochish' : '🔒 Yakunlash'}</button>
-        <button class="btn-ghost btn-sm" onclick="toggleTestShared('${t.id}', ${!t.shared}, loadTeachersList)">${t.shared ? '🚫 Umumiydan chiqarish' : '🌐 Umumiyga qo\'shish'}</button>
-        <button class="btn-ghost btn-sm" onclick="adminDeleteTeacherTest('${t.id}','${tuid}')">🗑</button>
+    return `<div class="lrow" style="background:var(--paper)">
+      <div class="lrow-main">
+        <div class="lrow-title">${esc(t.title)}
+          ${t.shared ? '<span class="pill p-blue">🌐 Umumiy</span>' : ''}
+          ${t.closed ? '<span class="pill p-red">🔒 Yopiq</span>' : ''}
+        </div>
+        <div class="lrow-sub">${t.questions.length} savol · ${t.timeLimit} daqiqa · ${t.attemptLimit||1} urinish</div>
       </div>
-      <div class="qr-slot center"></div>
+      <div class="lrow-act">
+        <button class="btn-jade btn-sm" onclick="curTestId='${t.id}';setTab('dash')">📊 Natijalar</button>
+        ${menuHtml('ttm-'+t.id, [
+          {label:'✏️ Tahrirlash', fn:`editTest('${t.id}')`},
+          {label:(t.closed?'🔓 Qayta ochish':'🔒 Yakunlash'), fn:`toggleTestClosed('${t.id}', ${!t.closed}, loadTeachersList)`},
+          {label:(t.shared?'🚫 Umumiydan chiqarish':'🌐 Umumiyga qoʻshish'), fn:`toggleTestShared('${t.id}', ${!t.shared}, loadTeachersList)`},
+          {label:'🔗 Havolani nusxalash', fn:`copyTestLink('${t.id}')`},
+          {label:'🗑 Korzinkaga', fn:`adminDeleteTeacherTest('${t.id}','${tuid}')`, danger:true}
+        ])}
+      </div>
     </div>`;
   }).join('');
 }
@@ -760,38 +909,42 @@ function renderTestList(){
   window.__visibleTestsCache = merged;
   const ids = Object.keys(merged).sort((a,b)=>(merged[b].createdAt||0)-(merged[a].createdAt||0));
   $('#tabBody').innerHTML = !ids.length
-    ? `<div class="card center"><p class="muted">Hozircha test yo'q. "➕ Yangi test" bo'limidan yarating.</p></div>`
+    ? `<div class="card"><div class="empty"><span class="ico">📚</span>Hozircha test yo'q.<br>"➕ Yangi test" bo'limidan yarating.</div></div>`
     : ids.map(id=>{
       const t = merged[id];
       const isOwner = t.ownerUid === currentUser.uid;
-      const canManage = isOwner || currentProfile.role === 'admin';
+      const isAdmin = currentProfile.role === 'admin';
+      const canManage = isOwner || isAdmin;
       const link = location.origin + location.pathname + '?t=' + id;
       return `<div class="card">
-        <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;align-items:flex-start">
-          <div>
-            <h3>${esc(t.title)}
-              ${t.shared ? '<span class="pill p-blue" style="margin-left:6px">🌐 Umumiy</span>' : ''}
-              ${t.closed ? '<span class="pill p-red" style="margin-left:6px">🔒 Yopiq</span>' : ''}
-              ${!isOwner ? `<span class="pill p-gray" style="margin-left:6px">${esc(t.ownerName||'')}</span>` : ''}
-              ${t.sourceTestId ? `<span class="pill p-gray" style="margin-left:6px">Manba: ${esc(t.sourceTitle||'umumiy test')}</span>` : ''}
-            </h3>
-            <p class="muted">${t.questions.length} savol · ${t.timeLimit} daqiqa · ${t.attemptLimit||1} urinish · ${t.shuffleQ?'savollar aralash':'tartibli'} ${t.showMistakes?'· xatolar ko\u2018rsatiladi':''}</p>
-            ${(t.startAt || t.endAt) ? `<p class="muted">${t.startAt?`Boshlanadi: ${new Date(t.startAt).toLocaleString('uz-UZ',{dateStyle:'medium',timeStyle:'short'})}`:''}${t.startAt&&t.endAt?' · ':''}${t.endAt?`Tugaydi: ${new Date(t.endAt).toLocaleString('uz-UZ',{dateStyle:'medium',timeStyle:'short'})}`:''}</p>` : ''}
+        <div class="lrow" style="border:none;background:transparent;padding:0;margin:0">
+          <div class="lrow-main">
+            <div class="lrow-title">${esc(t.title)}
+              ${t.shared ? '<span class="pill p-blue">🌐 Umumiy</span>' : ''}
+              ${t.closed ? '<span class="pill p-red">🔒 Yopiq</span>' : ''}
+              ${!isOwner ? `<span class="pill p-gray">${esc(t.ownerName||'')}</span>` : ''}
+              ${t.sourceTestId ? `<span class="pill p-gray">Manba: ${esc(t.sourceTitle||'umumiy test')}</span>` : ''}
+            </div>
+            <div class="lrow-sub">${t.questions.length} savol · ${t.timeLimit} daqiqa · ${t.attemptLimit||1} urinish · ${t.shuffleQ?'savollar aralash':'tartibli'}${t.showMistakes?' · xatolar ko\u2018rsatiladi':''}</div>
+            ${(t.startAt || t.endAt) ? `<div class="lrow-sub">${t.startAt?`Boshlanadi: ${fmtDT(t.startAt)}`:''}${t.startAt&&t.endAt?' · ':''}${t.endAt?`Tugaydi: ${fmtDT(t.endAt)}`:''}</div>` : ''}
+            ${t.updatedAt ? `<div class="lrow-sub">Tahrirlangan: ${esc(t.updatedByName||'')} · ${fmtD(t.updatedAt)}</div>` : ''}
           </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            ${(t.shared && !isOwner) ? `<button class="btn-red btn-sm" onclick="spawnOwnCopy('${id}')">📋 O'zim uchun nusxa olish</button>` : ''}
-            ${(t.shared && isOwner) ? `<button class="btn-ghost btn-sm" onclick="toggleTemplateCopies('${id}')">🔗 Nusxalar</button>` : ''}
+          <div class="lrow-act">
+            ${(t.shared && !isOwner) ? `<button class="btn-red btn-sm" onclick="spawnOwnCopy('${id}')">📋 O'zim uchun nusxa</button>` : ''}
             ${canManage ? `<button class="btn-jade btn-sm" onclick="curTestId='${id}';setTab('dash')">📊 Natijalar</button>` : ''}
-            ${canManage ? `<button class="btn-ghost btn-sm" onclick="editTest('${id}')">✏️ Tahrirlash</button>` : ''}
-            ${canManage ? `<button class="btn-ghost btn-sm" onclick="toggleTestClosed('${id}', ${!t.closed})">${t.closed ? '🔓 Qayta ochish' : '🔒 Yakunlash'}</button>` : ''}
-            ${currentProfile.role==='admin' ? `<button class="btn-ghost btn-sm" onclick="toggleTestShared('${id}', ${!t.shared}, renderTestList)">${t.shared ? '🚫 Umumiydan chiqarish' : '🌐 Umumiyga qo\'shish'}</button>` : ''}
-            ${canManage ? `<button class="btn-ghost btn-sm" onclick="delTest('${id}')">🗑</button>` : ''}
+            ${canManage ? menuHtml('tlm-'+id, [
+              {label:'✏️ Tahrirlash', fn:`editTest('${id}')`},
+              {label:(t.closed?'🔓 Qayta ochish':'🔒 Yakunlash'), fn:`toggleTestClosed('${id}', ${!t.closed})`},
+              isAdmin && {label:(t.shared?'🚫 Umumiydan chiqarish':'🌐 Umumiyga qoʻshish'), fn:`toggleTestShared('${id}', ${!t.shared}, renderTestList)`},
+              (t.shared && isOwner) && {label:'🔗 Kim nusxa olgan', fn:`toggleTemplateCopies('${id}')`},
+              {label:'🗑 Korzinkaga', fn:`delTest('${id}')`, danger:true}
+            ]) : ''}
           </div>
         </div>
         <label>O'quvchilar uchun doimiy havola</label>
         <div class="linkbox">
           <input readonly value="${link}" onclick="this.select()">
-          <button class="btn-p btn-sm" onclick="navigator.clipboard.writeText('${link}');this.textContent='✓'">Nusxa</button>
+          <button class="btn-p btn-sm" onclick="navigator.clipboard.writeText('${link}');this.textContent='✓ Nusxalandi'">Nusxa</button>
           <button class="btn-ghost btn-sm" onclick="toggleQR(this,'${link}')">QR</button>
         </div>
         <div class="qr-slot center"></div>
@@ -1089,7 +1242,7 @@ function renderCreate(){
   <div class="card">
     <h2>${ed ? '✏️ Testni tahrirlash' : 'Yangi test yaratish'}</h2>
     ${ed ? `<p class="muted">Egasi: <b>${esc(ed.ownerName||'—')}</b> · yaratilgan:
-        ${ed.createdAt ? new Date(ed.createdAt).toLocaleDateString('uz-UZ',{dateStyle:'medium'}) : '—'}
+        ${ed.createdAt ? fmtD(ed.createdAt) : '—'}
         ${ed.closed ? '· <span class="pill p-red">🔒 Yopiq</span>' : ''}</p>` : ''}
     <div id="c-editnote"></div>
     <label>Test nomi</label>
@@ -1390,10 +1543,10 @@ function drawLogs(){
   el.innerHTML = !rows.length
     ? `<p class="muted">Bu shartlarga mos qayd topilmadi.</p>`
     : `<p class="muted" style="margin-bottom:10px">${rows.length} ta qayd</p>
-       <div style="overflow-x:auto"><table>
+       <div class="tbl"><table>
        <tr><th>Vaqt</th><th>Kim</th><th>Amal</th><th>Nima ustida</th></tr>
        ${rows.map(r=>`<tr>
-         <td style="white-space:nowrap">${new Date(r.at||0).toLocaleString('uz-UZ',{dateStyle:'short',timeStyle:'short'})}</td>
+         <td style="white-space:nowrap">${fmtDT(r.at||0)}</td>
          <td><b>${esc(r.actorName||'—')}</b>${r.actorRole==='admin'?' <span class="pill p-blue">admin</span>':''}
              <br><span class="muted">${esc(r.actorEmail||'')}</span></td>
          <td style="white-space:nowrap">${esc(logLabel(r.action))}</td>
@@ -1417,7 +1570,7 @@ function downloadLogs(fmt){
   } else {
     const head = ['Vaqt','Kim','Email','Rol','Amal kodi','Amal','Test','O‘quvchi','Nishon','Egasi','Izoh'];
     const body = rows.map(r=>[
-      new Date(r.at||0).toLocaleString('uz-UZ'), r.actorName, r.actorEmail, r.actorRole,
+      fmtDT(r.at||0), r.actorName, r.actorEmail, r.actorRole,
       r.action, logLabel(r.action).replace(/^\S+\s/,''), r.testTitle, r.studentName, r.targetName, r.ownerName, r.note
     ].map(csvCell).join(','));
     downloadFile(`laoshi-qaydlar-${stamp}.csv`, '﻿' + [head.map(csvCell).join(',')].concat(body).join('\r\n'), 'text/csv;charset=utf-8');
@@ -1460,22 +1613,20 @@ const TRASH_KIND = { test:'📚 Test', session:'👤 O‘quvchi natijasi', teach
 function drawTrash(){
   const el = $('#tr-list'); if(!el) return;
   el.innerHTML = !trashCache.length
-    ? `<p class="muted">Korzinka bo'sh.</p>`
+    ? `<div class="empty"><span class="ico">🗑</span>Korzinka bo'sh.</div>`
     : trashCache.map(r=>{
         const days = Math.max(0, TRASH_TTL_DAYS - Math.floor((Date.now()-(r.at||0))/86400000));
-        return `<div class="card" style="background:var(--paper);margin-bottom:10px">
-          <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;align-items:flex-start">
-            <div>
-              <h3>${esc(r.title || '(nomsiz)')} <span class="pill p-gray" style="margin-left:6px">${TRASH_KIND[r.kind]||r.kind}</span></h3>
-              <p class="muted">O'chirgan: <b>${esc(r.byName||'—')}</b> ·
-              ${new Date(r.at||0).toLocaleString('uz-UZ',{dateStyle:'medium',timeStyle:'short'})} ·
-              ${days} kundan keyin butunlay o'chadi</p>
-              ${r.note ? `<p class="muted">${esc(r.note)}</p>` : ''}
-            </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <button class="btn-jade btn-sm" onclick="restoreTrash('${r._owner}','${r._id}')">♻️ Tiklash</button>
-              <button class="btn-ghost btn-sm" onclick="purgeTrash('${r._owner}','${r._id}')">Butunlay o'chirish</button>
-            </div>
+        return `<div class="lrow">
+          <div class="lrow-main">
+            <div class="lrow-title">${esc(r.title || '(nomsiz)')} <span class="pill p-gray">${TRASH_KIND[r.kind]||r.kind}</span></div>
+            <div class="lrow-sub">O'chirgan: <b>${esc(r.byName||'—')}</b> ·
+              ${fmtDT(r.at||0)} ·
+              ${days} kundan keyin butunlay o'chadi</div>
+            ${r.note ? `<div class="lrow-sub">${esc(r.note)}</div>` : ''}
+          </div>
+          <div class="lrow-act">
+            <button class="btn-jade btn-sm" onclick="restoreTrash('${r._owner}','${r._id}')">♻️ Tiklash</button>
+            ${menuHtml('trm-'+r._id, [{label:'♨️ Butunlay o‘chirish', fn:`purgeTrash('${r._owner}','${r._id}')`, danger:true}])}
           </div>
         </div>`;
       }).join('');
@@ -1514,6 +1665,252 @@ function purgeTrash(owner, id){
     .then(()=>{ loadTrash(); })
     .catch(e=> alert('O‘chirib bo‘lmadi: ' + e.message));
 }
+
+
+/* ================= KIRISH TARIXI (qurilma / IP) ================= */
+/* Brauzer o'z IP'sini bilmaydi — uni bepul tashqi xizmatdan so'raymiz.
+   Xizmat javob bermasa qayd baribir yoziladi, faqat IP bo'sh qoladi. */
+const LOGIN_KEEP = 50;   // har bir hisob uchun shuncha oxirgi kirish saqlanadi
+
+function deviceInfo(){
+  const ua = navigator.userAgent || '';
+  let os = 'Nomaʼlum tizim';
+  if(/Windows NT 10/.test(ua))      os = 'Windows 10/11';
+  else if(/Windows NT/.test(ua))    os = 'Windows';
+  else if(/iPhone/.test(ua))        os = 'iPhone';
+  else if(/iPad/.test(ua))          os = 'iPad';
+  else if(/Android/.test(ua))       os = 'Android';
+  else if(/Mac OS X/.test(ua))      os = 'macOS';
+  else if(/Linux/.test(ua))         os = 'Linux';
+  let br = 'Nomaʼlum brauzer';
+  if(/Edg\//.test(ua))                                      br = 'Edge';
+  else if(/OPR\//.test(ua))                                 br = 'Opera';
+  else if(/YaBrowser/.test(ua))                             br = 'Yandex';
+  else if(/Chrome\//.test(ua) && !/Chromium/.test(ua))      br = 'Chrome';
+  else if(/Firefox\//.test(ua))                             br = 'Firefox';
+  else if(/Safari\//.test(ua))                              br = 'Safari';
+  const m = ua.match(/(?:Edg|OPR|YaBrowser|Chrome|Firefox|Version)\/(\d+)/);
+  if(m) br += ' ' + m[1];
+  return { os, browser: br, mobile: /Mobi|Android|iPhone|iPad/.test(ua), ua: ua.slice(0,300) };
+}
+function fetchPublicIP(){
+  return new Promise(resolve=>{
+    let done = false;
+    const finish = v => { if(!done){ done = true; resolve(v || ''); } };
+    setTimeout(()=> finish(''), 3500);
+    fetch('https://api.ipify.org?format=json', {cache:'no-store'})
+      .then(r=> r.ok ? r.json() : null)
+      .then(d=> finish(d && d.ip))
+      .catch(()=> finish(''));
+  });
+}
+function recordLogin(){
+  const d = deviceInfo();
+  fetchPublicIP().then(ip=>{
+    const rec = { at: Date.now(), ip: ip || '', os: d.os, browser: d.browser, mobile: !!d.mobile, ua: d.ua };
+    const parts = [d.os, d.browser]; if(ip) parts.push('IP ' + ip);
+    logEvent('auth.login', { note: parts.join(' · '), ip: ip || '', device: d.os + ' · ' + d.browser });
+    db.ref('logins/'+currentUser.uid).push(rec)
+      .then(()=> trimLogins())
+      .catch(e=> console.warn('Kirish qaydi yozilmadi:', e));
+  });
+}
+function trimLogins(){
+  db.ref('logins/'+currentUser.uid).once('value').then(snap=>{
+    const v = snap.val() || {};
+    const keys = Object.keys(v);
+    if(keys.length <= LOGIN_KEEP) return;
+    const old = keys.map(k=>({k, at:(v[k]||{}).at||0})).sort((a,b)=>a.at-b.at)
+                    .slice(0, keys.length - LOGIN_KEEP);
+    const upd = {}; old.forEach(o=> upd['logins/'+currentUser.uid+'/'+o.k] = null);
+    db.ref().update(upd);
+  }).catch(()=>{});
+}
+
+/* ---------- 🔐 Kirishlarim ---------- */
+function renderLogins(){
+  $('#tabBody').innerHTML = `
+    <div class="card">
+      <h2>🔐 Kirishlarim</h2>
+      <p class="muted">Hisobingizga qaysi qurilmadan va qachon kirilgani. Tanimagan qurilmani ko'rsangiz,
+      darhol <b>🔑 Parolni almashtirish</b> orqali parolni o'zgartiring.</p>
+    </div>
+    <div class="card"><div id="li-list"><p class="muted">Yuklanmoqda…</p></div></div>`;
+  db.ref('logins/'+currentUser.uid).limitToLast(20).once('value').then(snap=>{
+    const v = snap.val() || {};
+    const rows = Object.values(v).sort((a,b)=>(b.at||0)-(a.at||0));
+    $('#li-list').innerHTML = !rows.length
+      ? `<p class="muted">Hozircha yozuv yo'q — keyingi kirishingizdan boshlab to'planadi.</p>`
+      : `<div class="tbl"><table>
+         <tr><th>Sana va vaqt</th><th>Qurilma</th><th>Brauzer</th><th>IP</th></tr>
+         ${rows.map((r,i)=>`<tr>
+           <td style="white-space:nowrap">${fmtDT(r.at||0)}
+             ${i===0?'<span class="pill p-green" style="margin-left:6px">oxirgi</span>':''}</td>
+           <td>${r.mobile?'📱':'💻'} ${esc(r.os||'—')}</td>
+           <td>${esc(r.browser||'—')}</td>
+           <td><span class="code">${esc(r.ip||'—')}</span></td>
+         </tr>`).join('')}</table></div>`;
+  }).catch(e=>{
+    $('#li-list').innerHTML = `<div class="note red">Kirish tarixini o'qib bo'lmadi: ${esc(e.message)}<br>
+      Firebase Database Rules'ga <b>logins</b> bo'limi qo'shilganini tekshiring — README'ga qarang.</div>`;
+  });
+}
+
+/* ================= TUGALLANMAGAN NATIJANI HISOBLASH ================= */
+/* Tugatgan o'quvchida bazadagi tayyor natija ishlatiladi; tugatmaganda shu paytgacha
+   to'plagani jonli hisoblanadi — bloklangan yoki chiqib ketgan o'quvchi ham ko'rinadi. */
+function scoreOf(s, t){
+  const qs = (t && t.questions) || [];
+  const total = qs.length;
+  if(s && s.status === 'finished'){
+    return { total, correct: s.correct||0, answered: Object.keys(s.answers||{}).length,
+             percent: s.percent||0, grade: s.grade || '—', done: true };
+  }
+  let correct = 0, answered = 0;
+  qs.forEach((q,i)=>{
+    const a = (s && s.answers || {})[i];
+    if(a != null){ answered++; if(a === q.correct) correct++; }
+  });
+  const percent = total ? Math.round(correct/total*100) : 0;
+  return { total, correct, answered, percent,
+           grade: gradeOf(percent, (t && t.criteria) || []), done: false };
+}
+function scoreCell(s, t){
+  const sc = scoreOf(s, t);
+  if(sc.done){
+    return `<b>${sc.correct}/${sc.total}</b> · ${sc.percent}% · <b>${esc(sc.grade)}</b>` +
+           (s.timeout ? ' <span class="muted">(vaqt tugadi)</span>' : '');
+  }
+  if(!sc.answered) return '<span class="muted">—</span>';
+  return `<b>${sc.correct}/${sc.total}</b> · ${sc.percent}% · <b>${esc(sc.grade)}</b>
+          <br><span class="muted">tugallanmagan · ${sc.answered} ta javob</span>`;
+}
+
+/* ================= 📋 BARCHA TESTLAR (faqat administrator) ================= */
+let allTestRows = [], allTestCounts = null;
+function renderAllTests(){
+  $('#tabBody').innerHTML = `
+    <div class="card">
+      <h2>📋 Barcha testlar</h2>
+      <p class="muted">Tizimdagi hamma test — kim yaratgani, holati va natijalari soni bilan.</p>
+      <div class="row" style="margin-top:12px">
+        <div><label>Qidiruv</label><input id="at-q" placeholder="test nomi yoki laoshi ismi…" oninput="drawAllTests()"></div>
+        <div><label>Laoshi</label><select id="at-owner" onchange="drawAllTests()"><option value="">Hammasi</option></select></div>
+        <div><label>Holat</label><select id="at-state" onchange="drawAllTests()">
+          <option value="">Hammasi</option>
+          <option value="open">🔓 Ochiq</option>
+          <option value="closed">🔒 Yopiq</option>
+          <option value="shared">🌐 Umumiy</option>
+        </select></div>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-ghost btn-sm" onclick="loadAllTests()">↻ Yangilash</button>
+        <button class="btn-ghost btn-sm" onclick="countAllResults()">📊 Natijalar sonini hisoblash</button>
+      </div>
+    </div>
+    <div class="card"><div id="at-list"><p class="muted">Yuklanmoqda…</p></div></div>`;
+  loadAllTests();
+}
+function loadAllTests(){
+  db.ref('tests').once('value').then(snap=>{
+    const v = snap.val() || {};
+    allTests = v;
+    allTestRows = Object.entries(v).map(([id,t])=> Object.assign({_id:id}, t))
+                        .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+    const owners = {};
+    allTestRows.forEach(t=>{ if(t.ownerUid) owners[t.ownerUid] = t.ownerName || t.ownerUid; });
+    const sel = $('#at-owner');
+    if(sel) sel.innerHTML = '<option value="">Hammasi</option>' +
+      Object.entries(owners).sort((a,b)=>String(a[1]).localeCompare(String(b[1])))
+        .map(([uid,nm])=>`<option value="${uid}">${esc(nm)}</option>`).join('');
+    drawAllTests();
+  }).catch(e=>{ $('#at-list').innerHTML = `<div class="note red">O'qib bo'lmadi: ${esc(e.message)}</div>`; });
+}
+function countAllResults(){
+  const btn = event && event.target; if(btn){ btn.disabled = true; btn.textContent = 'Hisoblanmoqda…'; }
+  Promise.all(allTestRows.map(t=>
+    db.ref('sessions/'+t._id).once('value').then(s=>[t._id, Object.keys(s.val()||{}).length]).catch(()=>[t._id, null])
+  )).then(pairs=>{
+    allTestCounts = {}; pairs.forEach(([id,n])=> allTestCounts[id] = n);
+    drawAllTests();
+    if(btn){ btn.disabled = false; btn.textContent = '↻ Qayta hisoblash'; }
+  });
+}
+function filteredAllTests(){
+  const q = ($('#at-q') ? $('#at-q').value : '').trim().toLowerCase();
+  const own = $('#at-owner') ? $('#at-owner').value : '';
+  const st = $('#at-state') ? $('#at-state').value : '';
+  return allTestRows.filter(t=>{
+    if(own && t.ownerUid !== own) return false;
+    if(st === 'open' && t.closed) return false;
+    if(st === 'closed' && !t.closed) return false;
+    if(st === 'shared' && !t.shared) return false;
+    if(q && !((t.title||'') + ' ' + (t.ownerName||'')).toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+function drawAllTests(){
+  const el = $('#at-list'); if(!el) return;
+  const rows = filteredAllTests();
+  if(!rows.length){ el.innerHTML = `<p class="muted">Mos test topilmadi.</p>`; return; }
+  el.innerHTML = `<p class="muted" style="margin-bottom:10px">${rows.length} ta test</p>` +
+    rows.map(t=>{
+      const id = t._id;
+      const cnt = allTestCounts ? allTestCounts[id] : null;
+      return `<div class="lrow">
+        <div class="lrow-main">
+          <div class="lrow-title">${esc(t.title||'(nomsiz)')}
+            ${t.shared ? '<span class="pill p-blue">🌐 Umumiy</span>' : ''}
+            ${t.closed ? '<span class="pill p-red">🔒 Yopiq</span>' : '<span class="pill p-green">🔓 Ochiq</span>'}
+            ${t.sourceTestId ? '<span class="pill p-gray">nusxa</span>' : ''}
+          </div>
+          <div class="lrow-sub">${esc(t.ownerName||'—')} · ${(t.questions||[]).length} savol · ${t.timeLimit||0} daqiqa
+            ${cnt==null ? '' : ` · <b>${cnt}</b> ta natija`}
+            ${t.createdAt ? ' · ' + fmtD(t.createdAt) : ''}
+            ${t.updatedAt ? ` · <span class="muted">tahrirlangan: ${esc(t.updatedByName||'')}</span>` : ''}
+          </div>
+        </div>
+        <div class="lrow-act">
+          <button class="btn-jade btn-sm" onclick="curTestId='${id}';setTab('dash')">📊 Natijalar</button>
+          ${menuHtml('atm-'+id, [
+            {label:'✏️ Tahrirlash', fn:`editTest('${id}')`},
+            {label:(t.closed?'🔓 Qayta ochish':'🔒 Yakunlash'), fn:`toggleTestClosed('${id}', ${!t.closed}, loadAllTests)`},
+            {label:(t.shared?'🚫 Umumiydan chiqarish':'🌐 Umumiyga qoʻshish'), fn:`toggleTestShared('${id}', ${!t.shared}, loadAllTests)`},
+            {label:'🔗 Havolani nusxalash', fn:`copyTestLink('${id}')`},
+            {label:'🗑 Korzinkaga', fn:`delTest('${id}', loadAllTests)`, danger:true}
+          ])}
+        </div>
+      </div>`;
+    }).join('');
+}
+function copyTestLink(id){
+  const link = location.origin + location.pathname + '?t=' + id;
+  navigator.clipboard.writeText(link).then(()=> alert('Havola nusxalandi:\n' + link),
+                                          ()=> prompt('Havolani nusxalab oling:', link));
+}
+
+/* ================= "⋯" MENYU ================= */
+/* Qatordagi tugmalar ko'payib ketmasligi uchun ikkinchi darajali amallar shu menyuga yig'iladi. */
+function menuHtml(id, items){
+  const list = (items||[]).filter(Boolean);
+  if(!list.length) return '';          // bo'sh menyu tugmasi ko'rsatilmaydi
+  items = list;
+  return `<div class="menu">
+    <button class="btn-ghost btn-sm menu-btn" onclick="toggleMenu(event,'${id}')" aria-label="Boshqa amallar">⋯</button>
+    <div class="menu-pop hidden" id="${id}">
+      ${items.filter(Boolean).map(it=>`<button class="menu-item${it.danger?' danger':''}" onclick="closeMenus();${it.fn}">${it.label}</button>`).join('')}
+    </div>
+  </div>`;
+}
+function closeMenus(){ document.querySelectorAll('.menu-pop').forEach(p=>p.classList.add('hidden')); }
+function toggleMenu(ev, id){
+  ev.stopPropagation();
+  const el = document.getElementById(id); if(!el) return;
+  const wasOpen = !el.classList.contains('hidden');
+  closeMenus();
+  if(!wasOpen) el.classList.remove('hidden');
+}
+document.addEventListener('click', closeMenus);
 
 /* ---------- LIVE DASHBOARD ---------- */
 function refreshDashSelect(){
@@ -1573,7 +1970,7 @@ function drawDash(){
 
   $('#dash-table').innerHTML = !rows.length
     ? `<p class="muted">Hali hech kim kirmadi. Havolani o'quvchilarga yuboring.</p>`
-    : `<div style="overflow-x:auto"><table>
+    : `<div class="tbl"><table>
     <tr><th></th><th>Ism</th><th>Holat</th><th>Javoblar</th><th>Natija</th><th>Chiqishlar</th><th>Amal</th></tr>
     ${rows.map(([sid,s])=>{
       const si = statusInfo(s,t);
@@ -1583,7 +1980,7 @@ function drawDash(){
         <td style="font-weight:600;cursor:pointer" onclick="showDetail('${sid}')">${esc(s.name)}</td>
         <td><span class="pill ${si.pill}">${si.txt}</span></td>
         <td>${answered}/${total}</td>
-        <td>${s.status==='finished' ? `<b>${s.correct}/${total}</b> · ${s.percent}% · <b>${esc(s.grade)}</b>${s.timeout?' <span class="muted">(vaqt tugadi)</span>':''}` : '—'}</td>
+        <td>${scoreCell(s, t)}</td>
         <td>${s.violations ? `<span class="pill p-red">${s.violations}×</span>` : '0'}</td>
         <td style="white-space:nowrap">
           ${s.status==='locked' ? `<button class="btn-jade btn-sm" onclick="approve('${sid}')">✓ Ruxsat</button>` : ''}
@@ -1657,9 +2054,9 @@ function exportExcel(){
   const ends = rows.map(s=>s.finishedAt).filter(Boolean);
   const minStart = starts.length ? Math.min(...starts) : (t.startAt || null);
   const maxEnd = ends.length ? Math.max(...ends) : (t.endAt || null);
-  const dateStr = minStart ? new Date(minStart).toLocaleDateString('uz-UZ',{dateStyle:'long'}) : '—';
-  const timeFrom = minStart ? new Date(minStart).toLocaleTimeString('uz-UZ',{hour:'2-digit',minute:'2-digit'}) : '—';
-  const timeTo = maxEnd ? new Date(maxEnd).toLocaleTimeString('uz-UZ',{hour:'2-digit',minute:'2-digit'}) : '—';
+  const dateStr = minStart ? fmtD(minStart) : '—';
+  const timeFrom = minStart ? fmtHM(minStart) : '—';
+  const timeTo = maxEnd ? fmtHM(maxEnd) : '—';
 
   const statusLabel = s => {
     if(s.status==='finished') return s.timeout ? "Tugatdi (vaqt tugadi)" : "Tugatdi";
@@ -1675,20 +2072,25 @@ function exportExcel(){
     ['Sana:', dateStr],
     ['Imtixon vaqti:', `${timeFrom} — ${timeTo}`],
     [],
-    ['№','Ism','To\u2018g\u2018ri','Jami','Foiz','Baho','Holat','Chiqishlar']
+    ['№','Ism','To\u2018g\u2018ri','Jami','Foiz','Baho','Javob berdi','Holat','Chiqishlar']
   ];
-  const body = sorted.map((s,i)=>[
-    i+1, s.name||'',
-    s.status==='finished' ? s.correct : '',
-    s.status==='finished' ? total : '',
-    s.status==='finished' ? s.percent+'%' : '',
-    s.status==='finished' ? (s.grade||'') : '',
-    statusLabel(s),
-    s.violations||0
-  ]);
+  const body = sorted.map((s,i)=>{
+    const sc = scoreOf(s, t);
+    const shown = sc.done || sc.answered > 0;   // tugatmagan bo'lsa ham to'plagani yoziladi
+    return [
+      i+1, s.name||'',
+      shown ? sc.correct : '',
+      shown ? total : '',
+      shown ? sc.percent+'%' : '',
+      shown ? (sc.grade||'') : '',
+      sc.answered,
+      statusLabel(s) + (!sc.done && sc.answered ? ' (tugallanmagan)' : ''),
+      s.violations||0
+    ];
+  });
 
   const ws = XLSX.utils.aoa_to_sheet([...header, ...body]);
-  ws['!cols'] = [{wch:4},{wch:24},{wch:8},{wch:8},{wch:8},{wch:16},{wch:20},{wch:11}];
+  ws['!cols'] = [{wch:4},{wch:24},{wch:8},{wch:8},{wch:8},{wch:16},{wch:12},{wch:24},{wch:11}];
   ws['!merges'] = [
     {s:{r:0,c:1},e:{r:0,c:3}}, {s:{r:1,c:1},e:{r:1,c:3}},
     {s:{r:2,c:1},e:{r:2,c:3}}, {s:{r:3,c:1},e:{r:3,c:3}}
@@ -1723,7 +2125,7 @@ function renderJoinGate(testId, test){
   renderJoin(testId, test);
 }
 function renderAvailability(test, kind){
-  const fmt = ts => new Date(ts).toLocaleString('uz-UZ', {dateStyle:'medium', timeStyle:'short'});
+  const fmt = ts => fmtDT(ts);
   app.innerHTML = `
   <div class="narrow" style="margin:0 auto">
     <div class="brand"><div class="seal">考</div><div><h1>${esc(test.title)}</h1></div></div>

@@ -20,11 +20,19 @@
  * O'RNATISH — README.md dagi "Majburiy parol reset (Apps Script)" bo'limiga qarang.
  */
 
-// ====== SHU IKKI QATORNI config.js dagi qiymatlar bilan bir xil qiling ======
+// ====== SHU UCH QATORNI config.js dagi qiymatlar bilan bir xil qiling ======
 const FIREBASE_PROJECT_ID = 'PROJECT_ID_BU_YERGA';   // config.js -> FIREBASE_CONFIG.projectId
 const FIREBASE_API_KEY    = 'API_KEY_BU_YERGA';      // config.js -> FIREBASE_CONFIG.apiKey
 const FIREBASE_DB_URL     = 'DATABASE_URL_BU_YERGA'; // config.js -> FIREBASE_CONFIG.databaseURL (oxirida / bo'lmasin)
 const DEFAULT_PASSWORD    = '111111';
+
+// Realtime Database REST API alohida "firebase.database" ruxsatini talab qiladi —
+// faqat cloud-platform bilan baza "Unauthorized" qaytaradi. Uchalasi ham kerak.
+const SCOPES_ = [
+  'https://www.googleapis.com/auth/firebase.database',
+  'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/cloud-platform'
+].join(' ');
 // ==============================================================================
 
 function doPost(e) {
@@ -79,11 +87,17 @@ function callIdentityToolkitPublic_(method, payload) {
 
 // Realtime Database'dan admin (service-account) huquqi bilan o'qish — Database Rules'ni chetlab o'tadi
 function dbGet_(accessToken, path) {
-  const url = FIREBASE_DB_URL + '/' + path + '.json';
+  const url = FIREBASE_DB_URL.replace(/\/+$/, '') + '/' + path + '.json';
   const res = UrlFetchApp.fetch(url, {
     method: 'get', headers: { Authorization: 'Bearer ' + accessToken }, muteHttpExceptions: true
   });
-  return JSON.parse(res.getContentText());
+  const code = res.getResponseCode();
+  const text = res.getContentText();
+  if (code !== 200) {
+    throw new Error('Bazaga ulanib bo\'lmadi (HTTP ' + code + '): ' + text +
+      ' — FIREBASE_DB_URL to\'g\'rimi va service account\'da "Firebase Realtime Database Admin" roli bormi?');
+  }
+  try { return JSON.parse(text); } catch (e) { throw new Error('Bazadan kutilmagan javob: ' + text); }
 }
 
 // Admin huquqi bilan parolni majburan o'zgartirish (bu — oddiy client SDK qila olmaydigan qism)
@@ -103,8 +117,8 @@ function callIdentityToolkitAdmin_(accessToken, uid, newPassword) {
 /* ---- Service Account JSON kaliti bilan Google OAuth2 access token olish ---- */
 function getServiceAccountToken_() {
   const props = PropertiesService.getScriptProperties();
-  const cached = props.getProperty('SA_TOKEN');
-  const cachedExp = Number(props.getProperty('SA_TOKEN_EXP') || 0);
+  const cached = props.getProperty('SA_TOKEN_V2');
+  const cachedExp = Number(props.getProperty('SA_TOKEN_V2_EXP') || 0);
   if (cached && Date.now() < cachedExp - 60000) return cached;
 
   const keyJsonRaw = props.getProperty('SERVICE_ACCOUNT_JSON');
@@ -114,7 +128,7 @@ function getServiceAccountToken_() {
   const now = Math.floor(Date.now() / 1000);
   const claim = {
     iss: keyJson.client_email,
-    scope: 'https://www.googleapis.com/auth/cloud-platform',
+    scope: SCOPES_,
     aud: 'https://oauth2.googleapis.com/token',
     iat: now,
     exp: now + 3600
@@ -132,11 +146,47 @@ function getServiceAccountToken_() {
   const data = JSON.parse(res.getContentText());
   if (!data.access_token) throw new Error('Service account tokeni olinmadi: ' + res.getContentText());
 
-  props.setProperty('SA_TOKEN', data.access_token);
-  props.setProperty('SA_TOKEN_EXP', String(Date.now() + data.expires_in * 1000));
+  props.setProperty('SA_TOKEN_V2', data.access_token);
+  props.setProperty('SA_TOKEN_V2_EXP', String(Date.now() + data.expires_in * 1000));
   return data.access_token;
 }
 
 function base64url_(str) {
   return Utilities.base64EncodeWebSafe(Utilities.newBlob(str).getBytes()).replace(/=+$/, '');
+}
+
+/* ==============================================================================
+   DIAGNOSTIKA — Apps Script ichida qo'lda ishga tushirish uchun.
+   Yuqoridagi ro'yxatdan "testSetup" ni tanlab ▷ Run bosing, so'ng pastdagi
+   "Execution log" da natijani o'qing. Saytga hech qanday ta'sir qilmaydi.
+   ============================================================================== */
+function testSetup() {
+  Logger.log('PROJECT_ID: ' + FIREBASE_PROJECT_ID);
+  Logger.log('DB_URL:     ' + FIREBASE_DB_URL);
+
+  var token;
+  try {
+    token = getServiceAccountToken_();
+    Logger.log('✅ Service account tokeni olindi.');
+  } catch (e) {
+    Logger.log('❌ Token olinmadi: ' + e.message);
+    return;
+  }
+
+  try {
+    var teachers = dbGet_(token, 'teachers');
+    if (!teachers) {
+      Logger.log('⚠️  Baza o\'qildi, lekin "teachers" bo\'sh. DB_URL boshqa loyihaniki bo\'lishi mumkin.');
+      return;
+    }
+    Logger.log('✅ Baza o\'qildi. Hisoblar soni: ' + Object.keys(teachers).length);
+    Object.keys(teachers).forEach(function (uid) {
+      var t = teachers[uid] || {};
+      Logger.log('   ' + (t.email || '(emailsiz)') + '  role=' + (t.role || '(yo\'q)') + '  active=' + (t.active !== false));
+    });
+    var admins = Object.keys(teachers).filter(function (u) { return (teachers[u] || {}).role === 'admin'; });
+    Logger.log(admins.length ? '✅ Administrator topildi: ' + admins.length + ' ta' : '❌ role="admin" bo\'lgan hisob yo\'q!');
+  } catch (e) {
+    Logger.log('❌ Bazani o\'qib bo\'lmadi: ' + e.message);
+  }
 }

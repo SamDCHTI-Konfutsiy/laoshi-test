@@ -309,6 +309,87 @@ mavjud `tests` va `sessions` qoidalariga administrator sharti qo'shilishi kerak:
 }
 ```
 
+## 3.7 Kirish tarixi, barcha testlar va tugallanmagan natijalar
+
+### 🔐 Kirishlarim
+
+Har bir laoshi o'z panelida **🔐 Kirishlarim** bo'limini ko'radi: hisobga qachon, qaysi qurilma va
+brauzerdan kirilgani, hamda IP manzil. Oxirgi 20 ta kirish ko'rsatiladi, bazada 50 tasi saqlanadi —
+undan eskisi avtomatik o'chadi.
+
+Administrator uchun bu ma'lumot **🧾 Qaydlar** jurnalida ham ko'rinadi: "🔑 Tizimga kirdi" qaydining
+izohida `Windows 10/11 · Chrome 131 · IP 84.54.x.x` deb turadi.
+
+IP haqida ochiq gapiraylik: brauzer o'z IP'sini bilmaydi, shuning uchun u bepul tashqi xizmatdan
+(`api.ipify.org`) so'raladi. Xizmat javob bermasa yoki tarmoq to'sib qo'ysa, IP bo'sh qoladi —
+qurilma, brauzer va vaqt baribir yoziladi. Va yodda tuting: IP odatda mobil operator yoki maktab
+Wi-Fi'siniki bo'ladi, aniq bir odamni ko'rsatmaydi. Tanish bo'lmagan qurilmani ko'rish ko'proq
+foyda beradi.
+
+### 📋 Barcha testlar (faqat administrator)
+
+Tizimdagi hamma test bitta ro'yxatda: kim yaratgani, savollar soni, vaqti, ochiq/yopiq/umumiy
+holati, yaratilgan sanasi va tahrirlangan bo'lsa kim tahrirlagani. Laoshi bo'yicha, holat bo'yicha
+filtr va nom/ism bo'yicha qidiruv bor.
+
+**📊 Natijalar sonini hisoblash** tugmasi har bir testga nechta o'quvchi kirganini qo'shib beradi.
+U alohida tugma qilingan, chunki bu barcha natijalarni yuklab ko'rishni talab qiladi — ro'yxat
+o'zi tez ochilsin uchun avtomatik bajarilmaydi.
+
+Har bir test yonidagi **⋯** menyusida: tahrirlash, yakunlash/qayta ochish, umumiylik, havolani
+nusxalash va korzinkaga o'chirish.
+
+### Tugallanmagan natijalar endi ko'rinadi
+
+Ilgari o'quvchi testni tugatmasa **📊 Jonli natijalar** dagi "Natija" ustunida `—` turardi.
+Endi u shu paytgacha to'plagan bali bilan ko'rinadi:
+
+```
+12/40 · 30% · 2 (Qoniqarsiz)
+tugallanmagan · 20 ta javob
+```
+
+Ya'ni o'quvchi 40 savoldan 20 tasini ishlab, keyin bloklangan yoki chiqib ketgan bo'lsa ham,
+laoshi uning holatini ko'radi. Baho ham hisoblanadi — to'g'ri javoblar **butun test** savollariga
+nisbatan olinadi, javob berilganlarga emas.
+
+Excel eksportiga ham shu qo'shildi: yangi **"Javob berdi"** ustuni va holat ustunida
+`(tugallanmagan)` belgisi.
+
+### Yangi Database Rules bloki
+
+`logins` uchun qoida qo'shilmasa, **🔐 Kirishlarim** bo'limi xato beradi. Rules'ga qo'shing:
+
+```json
+"logins": {
+  ".read": "auth != null && root.child('teachers').child(auth.uid).child('role').val() === 'admin'",
+  "$uid": {
+    ".read": "auth != null && (auth.uid === $uid || root.child('teachers').child(auth.uid).child('role').val() === 'admin')",
+    "$id": {
+      ".write": "auth != null && (auth.uid === $uid || root.child('teachers').child(auth.uid).child('role').val() === 'admin')"
+    }
+  }
+}
+```
+
+Ya'ni laoshi faqat o'z kirish tarixini o'qiydi va faqat o'ziga yozadi; administrator hammasini
+ko'radi.
+
+## 3.8 Panel ko'rinishi
+
+Panel qayta ishlandi:
+
+- Sarlavha yuqorida **yopishqoq** — pastga aylantirsangiz ham ism, "Parolni almashtirish" va
+  "Chiqish" ko'rinib turadi
+- Bo'limlar ko'paygani uchun tab qatori mobilda **yonga siljiydi**
+- Ro'yxat qatorlari (laoshilar, testlar, korzinka) bir xil ko'rinishga keltirildi: chapda nom va
+  belgilar, o'ngda amallar
+- Har qatorda faqat eng kerakli 1–2 tugma qoladi, qolgani **⋯** menyusiga yig'ildi — ilgari bir
+  qatorda oltita tugma yonma-yon turardi
+- Jadvallar aylantirilganda sarlavha qatori joyida turadi
+- Sanalar `24.08.2026 · 14:32` ko'rinishida yoziladi (avval brauzer `2026 M08 24` deb chiqarardi)
+- Mobilda tugmalar butun kenglikni egallaydi, kartochkalar ixchamlashdi
+
 ## 4. Ishlatish
 
 ### Test yaratish formati
