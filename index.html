@@ -486,7 +486,7 @@ function renderAdmin(){
   <div id="announceBanner"></div>
   <div class="tabs">
     <div class="tab ${adminTab==='tests'?'on':''}" data-tab="tests" onclick="setTab('tests')">📚 Testlarim</div>
-    <div class="tab ${adminTab==='create'?'on':''}" data-tab="create" onclick="setTab('create')">➕ Yangi test</div>
+    <div class="tab ${adminTab==='create'?'on':''}" data-tab="create" onclick="startNewTest()">➕ Yangi test</div>
     <div class="tab ${adminTab==='dash'?'on':''}" data-tab="dash" onclick="setTab('dash')">📊 Jonli natijalar</div>
     ${isAdmin ? `<div class="tab ${adminTab==='teachers'?'on':''}" data-tab="teachers" onclick="setTab('teachers')">👥 Laoshilar</div>` : ''}
     ${isAdmin ? `<div class="tab ${adminTab==='announce'?'on':''}" data-tab="announce" onclick="setTab('announce')">📢 E'lonlar</div>` : ''}
@@ -690,6 +690,7 @@ function toggleTeacherTests(tuid){
         <button class="btn-p btn-sm" onclick="navigator.clipboard.writeText('${link}');this.textContent='✓'">Nusxa</button>
         <button class="btn-ghost btn-sm" onclick="toggleQR(this,'${link}')">QR</button>
         <button class="btn-jade btn-sm" onclick="curTestId='${t.id}';setTab('dash')">📊 Natijalar</button>
+        <button class="btn-ghost btn-sm" onclick="editTest('${t.id}')">✏️ Tahrirlash</button>
         <button class="btn-ghost btn-sm" onclick="toggleTestClosed('${t.id}', ${!t.closed}, loadTeachersList)">${t.closed ? '🔓 Qayta ochish' : '🔒 Yakunlash'}</button>
         <button class="btn-ghost btn-sm" onclick="toggleTestShared('${t.id}', ${!t.shared}, loadTeachersList)">${t.shared ? '🚫 Umumiydan chiqarish' : '🌐 Umumiyga qo\'shish'}</button>
         <button class="btn-ghost btn-sm" onclick="adminDeleteTeacherTest('${t.id}','${tuid}')">🗑</button>
@@ -781,6 +782,7 @@ function renderTestList(){
             ${(t.shared && !isOwner) ? `<button class="btn-red btn-sm" onclick="spawnOwnCopy('${id}')">📋 O'zim uchun nusxa olish</button>` : ''}
             ${(t.shared && isOwner) ? `<button class="btn-ghost btn-sm" onclick="toggleTemplateCopies('${id}')">🔗 Nusxalar</button>` : ''}
             ${canManage ? `<button class="btn-jade btn-sm" onclick="curTestId='${id}';setTab('dash')">📊 Natijalar</button>` : ''}
+            ${canManage ? `<button class="btn-ghost btn-sm" onclick="editTest('${id}')">✏️ Tahrirlash</button>` : ''}
             ${canManage ? `<button class="btn-ghost btn-sm" onclick="toggleTestClosed('${id}', ${!t.closed})">${t.closed ? '🔓 Qayta ochish' : '🔒 Yakunlash'}</button>` : ''}
             ${currentProfile.role==='admin' ? `<button class="btn-ghost btn-sm" onclick="toggleTestShared('${id}', ${!t.shared}, renderTestList)">${t.shared ? '🚫 Umumiydan chiqarish' : '🌐 Umumiyga qo\'shish'}</button>` : ''}
             ${canManage ? `<button class="btn-ghost btn-sm" onclick="delTest('${id}')">🗑</button>` : ''}
@@ -888,30 +890,250 @@ function delAnnounce(id){
   });
 }
 
+/* ================= SAVOL KIRITISHNING QO'SHIMCHA YO'LLARI + TAHRIRLASH ================= */
+/* Matn maydoni (1-usul) o'zgarmagan holicha qoladi va yagona manba bo'lib turaveradi:
+   fayldan yuklash ham, bittalab qo'shish ham natijani o'sha maydonga yozadi. */
+
+let editingTestId = null;
+
+function questionsToText(qs){
+  return (qs||[]).map((q,i)=>
+    [(i+1)+'. '+q.q].concat((q.options||[]).map((o,j)=> (j===q.correct?'#':'') + (LETTERS[j]||'') + '. ' + o)).join('\n')
+  ).join('\n---\n');
+}
+function criteriaToText(cs){
+  return (cs||[]).map(c=> c.min + ' = ' + c.label).join('\n');
+}
+function appendToBody(text){
+  const el = $('#c-body'); if(!el) return;
+  const cur = el.value.trim();
+  el.value = cur ? cur + '\n---\n' + text : text;
+  el.scrollTop = el.scrollHeight;
+}
+
+/* ---------- Namuna fayllar ---------- */
+const SAMPLE_TXT = `1. «你好» so'zi nima degani?
+A. Rahmat
+#B. Salom
+C. Xayr
+D. Kechirasiz
+---
+2. «我是学生» gapida «学生» nima?
+A. Fe'l
+#B. Ot (talaba)
+C. Sifat
+---
+3. «谢谢» qanday o'qiladi?
+A. nǐ hǎo
+#B. xiè xie
+C. zài jiàn`;
+
+const SAMPLE_CSV = `Savol,A,B,C,D,To'g'ri
+"«你好» so'zi nima degani?",Rahmat,Salom,Xayr,Kechirasiz,B
+"«我是学生» gapida «学生» nima?",Fe'l,Ot (talaba),Sifat,,B
+"«谢谢» qanday o'qiladi?",nǐ hǎo,xiè xie,zài jiàn,,B`;
+
+function downloadSample(kind){
+  if(kind === 'txt') downloadFile('namuna-test.txt', SAMPLE_TXT, 'text/plain;charset=utf-8');
+  else downloadFile('namuna-test.csv', '﻿' + SAMPLE_CSV, 'text/csv;charset=utf-8');
+}
+
+/* ---------- CSV o'qish ---------- */
+function detectDelim(line){
+  const c = (line.match(/,/g)||[]).length, s = (line.match(/;/g)||[]).length;
+  return s > c ? ';' : ',';
+}
+function parseCSV(text, delim){
+  const rows = []; let row = [], cur = '', inQ = false;
+  for(let i = 0; i < text.length; i++){
+    const ch = text[i];
+    if(inQ){
+      if(ch === '"'){ if(text[i+1] === '"'){ cur += '"'; i++; } else inQ = false; }
+      else cur += ch;
+    }
+    else if(ch === '"') inQ = true;
+    else if(ch === delim){ row.push(cur); cur = ''; }
+    else if(ch === '\n'){ row.push(cur); rows.push(row); row = []; cur = ''; }
+    else if(ch !== '\r') cur += ch;
+  }
+  if(cur !== '' || row.length){ row.push(cur); rows.push(row); }
+  return rows.filter(r=> r.some(c=> String(c).trim() !== ''));
+}
+/* CSV qatori: Savol, A, B, C, D, ..., To'g'ri(harf yoki raqam) */
+function csvToText(text){
+  const first = text.split('\n')[0] || '';
+  let rows = parseCSV(text, detectDelim(first));
+  if(!rows.length) return { text:'', errors:['Fayl bo‘sh ko‘rinadi.'] };
+  const h0 = String(rows[0][0]||'').trim().toLowerCase();
+  if(h0 === 'savol' || h0 === 'savollar' || h0 === 'question') rows = rows.slice(1);
+  const blocks = [], errors = [];
+  rows.forEach((r, i)=>{
+    const cells = r.map(c=> String(c).trim());
+    const q = cells[0];
+    const answer = cells[cells.length-1];
+    const options = cells.slice(1, cells.length-1).filter(c=> c !== '');
+    if(!q){ errors.push(`${i+1}-qator: savol matni bo‘sh`); return; }
+    if(options.length < 2){ errors.push(`${i+1}-qator: kamida 2 ta variant kerak`); return; }
+    let ci = -1;
+    if(/^[A-Za-z]$/.test(answer)) ci = answer.toUpperCase().charCodeAt(0) - 65;
+    else if(/^\d+$/.test(answer)) ci = (+answer) - 1;
+    if(ci < 0 || ci >= options.length){
+      errors.push(`${i+1}-qator: to‘g‘ri javob "${answer}" tushunarsiz (A, B, C… yoki 1, 2, 3… bo‘lsin)`);
+      return;
+    }
+    blocks.push([q].concat(options.map((o,j)=> (j===ci?'#':'') + (LETTERS[j]||'') + '. ' + o)).join('\n'));
+  });
+  return { text: blocks.join('\n---\n'), errors, count: blocks.length };
+}
+
+function fileInfo(msg, type){
+  const el = $('#c-fileinfo'); if(el) el.innerHTML = msg ? `<div class="note ${type||'red'}">${msg}</div>` : '';
+}
+function loadTestFile(input){
+  const f = input.files && input.files[0]; if(!f) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    const raw = String(reader.result || '').replace(/^﻿/, '');
+    const isCsv = /\.csv$/i.test(f.name) || (raw.split('\n')[0]||'').split(/[,;]/).length >= 3 && !/\n\s*-{3,}/.test(raw);
+    let body, note;
+    if(isCsv){
+      const res = csvToText(raw);
+      if(res.errors && res.errors.length){
+        fileInfo('<b>Faylda xatolar bor:</b><br>' + res.errors.map(esc).join('<br>') +
+                 (res.text ? '<br><br>Xatosiz qatorlar baribir qo‘shildi.' : ''), 'red');
+      }
+      if(!res.text){ input.value=''; return; }
+      body = res.text; note = `${res.count} ta savol CSV fayldan o‘qildi`;
+    } else {
+      const chk = parseTest(raw);
+      if(!chk.questions.length){
+        fileInfo('Faylda savol topilmadi. Format namunasini yuklab olib solishtiring.', 'red');
+        input.value=''; return;
+      }
+      if(chk.errors.length) fileInfo('<b>Ogohlantirish:</b><br>' + chk.errors.map(esc).join('<br>'), 'red');
+      body = raw.trim(); note = `${chk.questions.length} ta savol matnli fayldan o‘qildi`;
+    }
+    appendToBody(body);
+    const el = $('#c-fileinfo');
+    if(el) el.innerHTML = (el.innerHTML||'') + `<div class="note green">✅ ${esc(note)} va pastdagi savollar maydoniga qo‘shildi. Tekshirib, kerak bo‘lsa qo‘lda tuzating.</div>`;
+    previewTest();
+    input.value = '';
+  };
+  reader.onerror = ()=> fileInfo('Faylni o‘qib bo‘lmadi.', 'red');
+  reader.readAsText(f, 'utf-8');
+}
+
+/* ---------- Bittalab qo'shish ---------- */
+function builderOptionRows(n){
+  return Array.from({length:n}, (_,j)=>
+    `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+       <label style="width:26px;margin:0;font-weight:700">${LETTERS[j]}.</label>
+       <input id="b-o${j}" placeholder="${j<2?'variant (majburiy)':'variant (ixtiyoriy)'}" style="margin:0">
+       <label style="display:flex;align-items:center;gap:4px;margin:0;white-space:nowrap;font-weight:400">
+         <input type="radio" name="b-correct" value="${j}" style="width:auto;margin:0"> to'g'ri
+       </label>
+     </div>`).join('');
+}
+function builderAdd(){
+  const q = $('#b-q').value.trim();
+  const opts = [];
+  for(let j=0;j<6;j++){ const v = $('#b-o'+j).value.trim(); if(v) opts.push({j, v}); }
+  const picked = document.querySelector('input[name="b-correct"]:checked');
+  const errEl = $('#b-err');
+  const err = m => { errEl.innerHTML = m ? `<div class="note red">${esc(m)}</div>` : ''; };
+  if(!q) return err('Savol matnini kiriting');
+  if(opts.length < 2) return err('Kamida 2 ta variant kerak');
+  if(!picked) return err("To'g'ri javobni belgilang");
+  const ci = opts.findIndex(o=> o.j === +picked.value);
+  if(ci === -1) return err("To'g'ri deb belgilangan variant bo'sh — matnini yozing yoki boshqasini tanlang");
+  err('');
+  appendToBody([q].concat(opts.map((o,k)=> (k===ci?'#':'') + LETTERS[k] + '. ' + o.v)).join('\n'));
+  $('#b-q').value = '';
+  for(let j=0;j<6;j++) $('#b-o'+j).value = '';
+  if(picked) picked.checked = false;
+  const n = parseTest($('#c-body').value).questions.length;
+  errEl.innerHTML = `<div class="note green">✅ Qo'shildi. Hozir jami ${n} ta savol.</div>`;
+  previewTest();
+  $('#b-q').focus();
+}
+
+/* ---------- Testni tahrirlash ---------- */
+function editTest(id){
+  db.ref('tests/'+id).once('value').then(snap=>{
+    const t = snap.val();
+    if(!t) return alert('Test topilmadi.');
+    const isOwner = t.ownerUid === currentUser.uid;
+    if(!isOwner && currentProfile.role !== 'admin') return alert('Bu testni faqat egasi yoki administrator tahrirlay oladi.');
+    window.__editSrc = t;
+    editingTestId = id;
+    adminTab = 'create';
+    setTab('create');
+    return db.ref('sessions/'+id).once('value').then(sSnap=>{
+      const n = Object.keys(sSnap.val()||{}).length;
+      const el = $('#c-editnote');
+      if(el && n) el.innerHTML = `<div class="note red"><b>Diqqat:</b> bu testda allaqachon ${n} ta o'quvchi natijasi bor.
+        Savollarni o'zgartirsangiz yoki tartibini almashtirsangiz, eski natijalar shu yangi savollarga
+        moslab ko'rsatiladi — ya'ni "kim qaysi savolda xato qilgan" degan tahlil noto'g'ri chiqadi.
+        Nomi, vaqti, urinishlar soni kabi sozlamalarni o'zgartirish esa xavfsiz.</div>`;
+    });
+  }).catch(e=> alert('Ochib bo‘lmadi: ' + e.message));
+}
+function startNewTest(){ editingTestId = null; window.__editSrc = null; setTab('create'); }
+
 function renderCreate(){
+  const ed = editingTestId ? (window.__editSrc || {}) : null;
+  const dtLocal = ms => { if(!ms) return ''; const d = new Date(ms); const p = x=>String(x).padStart(2,'0');
+    return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
+  const sel = (cond) => cond ? ' selected' : '';
   $('#tabBody').innerHTML = `
   <div class="card">
-    <h2>Yangi test yaratish</h2>
+    <h2>${ed ? '✏️ Testni tahrirlash' : 'Yangi test yaratish'}</h2>
+    ${ed ? `<p class="muted">Egasi: <b>${esc(ed.ownerName||'—')}</b> · yaratilgan:
+        ${ed.createdAt ? new Date(ed.createdAt).toLocaleDateString('uz-UZ',{dateStyle:'medium'}) : '—'}
+        ${ed.closed ? '· <span class="pill p-red">🔒 Yopiq</span>' : ''}</p>` : ''}
+    <div id="c-editnote"></div>
     <label>Test nomi</label>
-    <input id="c-title" placeholder="Masalan: HSK 2 · 5-dars grammatikasi">
+    <input id="c-title" value="${ed ? esc(ed.title||'') : ''}" placeholder="Masalan: HSK 2 · 5-dars grammatikasi">
     <div class="row">
-      <div><label>Vaqt (daqiqa)</label><input id="c-time" type="number" value="20" min="1"></div>
-      <div><label>Urinishlar soni</label><input id="c-attempts" type="number" value="1" min="1"></div>
+      <div><label>Vaqt (daqiqa)</label><input id="c-time" type="number" value="${ed ? (ed.timeLimit||20) : 20}" min="1"></div>
+      <div><label>Urinishlar soni</label><input id="c-attempts" type="number" value="${ed ? (ed.attemptLimit||1) : 1}" min="1"></div>
       <div><label>Savollar aralashsinmi?</label>
-        <select id="c-shq"><option value="1">Ha (har kimda har xil tartib)</option><option value="0">Yo'q</option></select></div>
+        <select id="c-shq"><option value="1"${sel(!ed || ed.shuffleQ)}>Ha (har kimda har xil tartib)</option><option value="0"${sel(ed && !ed.shuffleQ)}>Yo'q</option></select></div>
       <div><label>Variantlar aralashsinmi?</label>
-        <select id="c-sho"><option value="1">Ha</option><option value="0">Yo'q</option></select></div>
+        <select id="c-sho"><option value="1"${sel(!ed || ed.shuffleO)}>Ha</option><option value="0"${sel(ed && !ed.shuffleO)}>Yo'q</option></select></div>
       <div><label>O'quvchi xatosini ko'rsinmi?</label>
-        <select id="c-mis"><option value="0">Yo'q, faqat baho</option><option value="1">Ha, qaysi savolda xato qilganini</option></select></div>
+        <select id="c-mis"><option value="0"${sel(!ed || !ed.showMistakes)}>Yo'q, faqat baho</option><option value="1"${sel(ed && ed.showMistakes)}>Ha, qaysi savolda xato qilganini</option></select></div>
     </div>
     <div class="row">
-      <div><label>Boshlanish vaqti <span class="muted" style="font-weight:400">(ixtiyoriy)</span></label><input id="c-start" type="datetime-local"></div>
-      <div><label>Tugash vaqti <span class="muted" style="font-weight:400">(ixtiyoriy)</span></label><input id="c-end" type="datetime-local"></div>
+      <div><label>Boshlanish vaqti <span class="muted" style="font-weight:400">(ixtiyoriy)</span></label><input id="c-start" type="datetime-local" value="${ed ? dtLocal(ed.startAt) : ''}"></div>
+      <div><label>Tugash vaqti <span class="muted" style="font-weight:400">(ixtiyoriy)</span></label><input id="c-end" type="datetime-local" value="${ed ? dtLocal(ed.endAt) : ''}"></div>
     </div>
     ${currentProfile.role==='admin' ? `<div class="row">
       <div><label>Umumiylik</label>
-        <select id="c-shared"><option value="0">Faqat menda</option><option value="1">🌐 Umumiy — barcha laoshilarga ko'rinsin</option></select></div>
+        <select id="c-shared"><option value="0"${sel(!ed || !ed.shared)}>Faqat menda</option><option value="1"${sel(ed && ed.shared)}>🌐 Umumiy — barcha laoshilarga ko'rinsin</option></select></div>
     </div>` : ''}
+
+    <div class="card" style="background:var(--paper);margin-top:16px">
+      <h3 style="margin-top:0">➕ Savollarni kiritishning qo'shimcha yo'llari</h3>
+      <p class="muted">Ikkalasi ham natijani pastdagi <b>Savollar</b> maydoniga qo'shadi — u yerda tekshirib,
+      kerak bo'lsa qo'lda tuzatasiz. Maydonga to'g'ridan-to'g'ri yozish ham avvalgidek ishlayveradi.</p>
+
+      <label style="margin-top:12px">📎 Fayldan yuklash <span class="muted" style="font-weight:400">(.txt yoki .csv)</span></label>
+      <input type="file" id="c-file" accept=".txt,.csv,text/plain,text/csv" onchange="loadTestFile(this)">
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="btn-ghost btn-sm" onclick="downloadSample('txt')">⬇ Namuna .txt</button>
+        <button type="button" class="btn-ghost btn-sm" onclick="downloadSample('csv')">⬇ Namuna .csv (Excel)</button>
+      </div>
+      <p class="muted" style="margin-top:6px">CSV ustunlari: <b>Savol, A, B, C, D, To'g'ri</b> — oxirgi ustunga
+      to'g'ri javobning harfi (A, B, C…) yoki raqami (1, 2, 3…) yoziladi. Kerak bo'lmagan variant ustunini bo'sh qoldiring.</p>
+
+      <label style="margin-top:16px">🧩 Bittalab qo'shish</label>
+      <input id="b-q" placeholder="Savol matni" onkeydown="if(event.key==='Enter')document.getElementById('b-o0').focus()">
+      <div style="margin-top:8px">${builderOptionRows(6)}</div>
+      <div id="b-err"></div>
+      <div style="margin-top:8px"><button type="button" class="btn-p btn-sm" onclick="builderAdd()">➕ Savolni qo'shish</button></div>
+    </div>
+
     <label>Savollar <span class="muted" style="font-weight:400">(har savol <b>---</b> bilan ajratiladi; variant oldiga A./B./C. qo'yishingiz mumkin, to'g'ri javob oldiga <b>#</b>)</span></label>
     <textarea id="c-body" rows="14" placeholder="1. «你好» so'zi nima degani?
 A. Rahmat
@@ -924,18 +1146,20 @@ A. Fe'l
 #B. Ot (talaba)
 C. Sifat
 ---
-3. ..."></textarea>
+3. ...">${ed ? esc(questionsToText(ed.questions)) : ''}</textarea>
     <label>Baho mezoni <span class="muted" style="font-weight:400">(foiz = baho; laoshi o'zi belgilaydi)</span></label>
-    <textarea id="c-crit" rows="4">86 = 5 (A'lo)
+    <textarea id="c-crit" rows="4">${ed ? esc(criteriaToText(ed.criteria)) : `86 = 5 (A'lo)
 71 = 4 (Yaxshi)
 56 = 3 (Qoniqarli)
-0 = 2 (Qoniqarsiz)</textarea>
-    <div style="margin-top:16px;display:flex;gap:10px">
+0 = 2 (Qoniqarsiz)`}</textarea>
+    <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
       <button class="btn-ghost" onclick="previewTest()">👁 Tekshirish</button>
-      <button class="btn-red" onclick="saveTest()">💾 Saqlash va havola olish</button>
+      <button class="btn-red" onclick="saveTest()">${ed ? "💾 O'zgarishlarni saqlash" : '💾 Saqlash va havola olish'}</button>
+      ${ed ? `<button class="btn-ghost" onclick="startNewTest()">Bekor qilish</button>` : ''}
     </div>
     <div id="c-preview"></div>
   </div>`;
+  if(ed) previewTest();
 }
 function previewTest(){
   const {questions, errors} = parseTest($('#c-body').value);
@@ -947,6 +1171,8 @@ function previewTest(){
       </div>`).join('') : '');
 }
 function saveTest(){
+  const editing = editingTestId;
+  const src = editing ? (window.__editSrc || {}) : null;
   const title = $('#c-title').value.trim();
   const {questions, errors} = parseTest($('#c-body').value);
   const criteria = parseCriteria($('#c-crit').value);
@@ -957,23 +1183,49 @@ function saveTest(){
   const startAt = $('#c-start').value ? new Date($('#c-start').value).getTime() : null;
   const endAt = $('#c-end').value ? new Date($('#c-end').value).getTime() : null;
   if(startAt && endAt && endAt <= startAt) return alert("Tugash vaqti boshlanish vaqtidan keyin bo'lishi kerak");
-  const id = uid(6);
+  const id = editing || uid(6);
   const sharedEl = $('#c-shared');
-  db.ref('tests/'+id).set({
+  const rec = {
     title, questions, criteria,
     timeLimit: Math.max(1, +$('#c-time').value||20),
     attemptLimit: Math.max(1, +$('#c-attempts').value||1),
     startAt, endAt,
     shuffleQ: $('#c-shq').value==='1', shuffleO: $('#c-sho').value==='1',
     showMistakes: $('#c-mis').value==='1',
-    shared: !!(sharedEl && sharedEl.value==='1'),
-    ownerUid: currentUser.uid, ownerName: currentUser.displayName || currentUser.email,
-    createdAt: Date.now()
-  }).then(()=> logEvent('test.create', { testId:id, testTitle:title, note:`${questions.length} savol · ${sharedEl&&sharedEl.value==='1'?'umumiy':'shaxsiy'}` }))
-    .then(()=>{ curTestId = id; adminTab='tests'; setTab('tests');
-    alert('Test saqlandi! Havolani "Testlarim" bo\u2018limidan oling.'); });
+    shared: sharedEl ? sharedEl.value==='1' : (editing ? !!src.shared : false),
+    ownerUid:  editing ? (src.ownerUid || currentUser.uid) : currentUser.uid,
+    ownerName: editing ? (src.ownerName || '') : (currentUser.displayName || currentUser.email),
+    createdAt: editing ? (src.createdAt || Date.now()) : Date.now()
+  };
+  if(editing){
+    // Tahrirlashda tegilmasligi kerak bo'lgan maydonlar saqlanib qoladi
+    if(src.closed) rec.closed = true;
+    if(src.sourceTestId){ rec.sourceTestId = src.sourceTestId; rec.sourceTitle = src.sourceTitle || ''; }
+    rec.updatedAt = Date.now();
+    rec.updatedByUid = currentUser.uid;
+    rec.updatedByName = (currentProfile && currentProfile.name) || currentUser.email;
+  }
+  db.ref('tests/'+id).set(rec).then(()=>{
+    if(!editing){
+      return logEvent('test.create', { testId:id, testTitle:title, note:`${questions.length} savol · ${rec.shared?'umumiy':'shaxsiy'}` });
+    }
+    const ch = [];
+    if((src.title||'') !== title) ch.push(`nomi: "${src.title||''}" → "${title}"`);
+    const oldN = (src.questions||[]).length;
+    if(oldN !== questions.length) ch.push(`savollar soni: ${oldN} → ${questions.length}`);
+    else if(JSON.stringify(src.questions||[]) !== JSON.stringify(questions)) ch.push('savol matnlari o‘zgardi');
+    if((src.timeLimit||0) !== rec.timeLimit) ch.push(`vaqt: ${src.timeLimit||0} → ${rec.timeLimit} daqiqa`);
+    if((src.attemptLimit||1) !== rec.attemptLimit) ch.push(`urinish: ${src.attemptLimit||1} → ${rec.attemptLimit}`);
+    if(!!src.shared !== !!rec.shared) ch.push(rec.shared ? 'umumiyga qo‘shildi' : 'umumiydan chiqarildi');
+    if(JSON.stringify(src.criteria||[]) !== JSON.stringify(criteria)) ch.push('baho mezoni o‘zgardi');
+    if(!ch.length) ch.push('sozlamalar yangilandi');
+    return logEvent('test.edit', { testId:id, testTitle:title, ownerUid:rec.ownerUid, ownerName:rec.ownerName, note: ch.join(' · ') });
+  }).then(()=>{
+    editingTestId = null; window.__editSrc = null;
+    curTestId = id; adminTab='tests'; setTab('tests');
+    alert(editing ? "✅ O'zgarishlar saqlandi." : 'Test saqlandi! Havolani "Testlarim" bo‘limidan oling.');
+  }).catch(e=> alert("Saqlab bo'lmadi: " + e.message));
 }
-
 
 /* ================= QAYDLAR (audit log) VA KORZINKA ================= */
 /* Har bir muhim amal `logs` tuguniga yoziladi: kim, qachon, nima qildi, qaysi test/o'quvchi ustida.
@@ -983,6 +1235,7 @@ const TRASH_TTL_DAYS = 90;   // korzinkadagi yozuv shuncha kundan keyin avtomati
 
 const LOG_LABELS = {
   'test.create':        '📝 Test yaratdi',
+  'test.edit':          '✏️ Testni tahrirladi',
   'test.delete':        '🗑 Testni o‘chirdi',
   'test.close':         '🔒 Testni yakunladi',
   'test.open':          '🔓 Testni qayta ochdi',

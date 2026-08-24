@@ -167,6 +167,54 @@ tugma "sozlanmagan" deb xabar beradi.
 - `config.js` ichidagi `window.APPS_SCRIPT_URL` qatoriga 2-qadamdagi Web app URL'ni qo'ying, saqlang va GitHub'ga qayta yuklang (yoki push qiling)
 - Tayyor — endi admin panelida "🔁 111111ga tiklash" tugmasi ishlaydi
 
+## 3.55 Test yaratish va tahrirlash — uch xil yo'l
+
+Savollarni kiritishning uchta yo'li bor va **uchalasi ham bir joyga** — "➕ Yangi test" bo'limidagi
+**Savollar** maydoniga tushadi. Ya'ni fayldan yuklasangiz ham, bittalab qo'shsangiz ham, natijani
+o'sha maydonda ko'rasiz, tekshirasiz va kerak bo'lsa qo'lda tuzatasiz.
+
+**1) Matn maydoniga yozish (avvalgidek).** Hech narsa o'zgarmadi: har savol `---` bilan ajratiladi,
+to'g'ri javob oldiga `#` qo'yiladi. Ilgari shu usulda ishlagan bo'lsangiz, xuddi shunday davom eting.
+
+**2) Fayldan yuklash.** `.txt` yoki `.csv` faylni tanlaysiz.
+
+- `.txt` — matn maydonidagi format bilan bir xil. **⬇ Namuna .txt** tugmasi tayyor namunani beradi.
+- `.csv` — Excel yoki Google Sheets'da tayyorlash uchun. Ustunlar: **Savol, A, B, C, D, To'g'ri**.
+  Oxirgi ustunga to'g'ri javobning harfi (`A`, `B`, `C`…) yoki raqami (`1`, `2`, `3`…) yoziladi.
+  Kerak bo'lmagan variant ustunini bo'sh qoldirasiz — masalan uch variantli savolda `D` bo'sh turadi.
+  **⬇ Namuna .csv** tugmasi tayyor jadvalni beradi, uni Excel'da ochib ustidan yozaverasiz.
+
+Vergul yoki qo'shtirnoq ichida bo'lgan matnlar to'g'ri o'qiladi. Nuqta-vergul (`;`) bilan ajratilgan
+CSV ham qabul qilinadi — Excel ba'zi tillarda shunday saqlaydi. Biror qator xato bo'lsa, nechanchi
+qator ekani va nima yetishmayotgani aytiladi, qolgan to'g'ri qatorlar baribir qo'shiladi.
+
+**3) Bittalab qo'shish.** Savol matnini yozasiz, variantlarni to'ldirasiz, to'g'risining yonidagi
+doirachani belgilaysiz va **➕ Savolni qo'shish** bosasiz. Maydonlar tozalanadi va keyingi savolni
+yozaverasiz. Oltitagacha variant bo'lishi mumkin, bo'sh qoldirilganlari hisobga olinmaydi.
+
+### ✏️ Testni tahrirlash
+
+Endi yaratilgan testni o'zgartirish mumkin. **📚 Testlarim** ro'yxatida (va administrator uchun
+**👥 Laoshilar → 📚 Testlari** ichida) har bir testda **✏️ Tahrirlash** tugmasi bor.
+
+Bosilganda test butun sozlamalari va savollari bilan formaga yuklanadi — nomi, vaqti, urinishlar
+soni, aralashtirish, boshlanish/tugash vaqti, baho mezoni va barcha savollar. Xohlaganingizni
+o'zgartirib **💾 O'zgarishlarni saqlash** bosasiz. Test havolasi **o'zgarmaydi**, ya'ni
+o'quvchilarga tarqatilgan havola ishlayveradi.
+
+Tahrirlashda saqlanib qoladigan narsalar: test egasi, yaratilgan sana, yopiq/ochiq holati, umumiy
+testdan olingan nusxa bo'lsa manba haqidagi ma'lumot. Kim va qachon tahrirlagani testga yozib
+qo'yiladi va qaydlar jurnaliga ham tushadi — jurnalda aynan nima o'zgargani ko'rinadi (masalan
+`nomi: "HSK 2" → "HSK 3" · savollar soni: 10 → 12`).
+
+**Diqqat:** agar testda allaqachon o'quvchi natijalari bo'lsa, tahrirlash oynasida qizil
+ogohlantirish chiqadi. Nomi, vaqti, urinishlar sonini o'zgartirish xavfsiz. Lekin savollarni
+o'zgartirsangiz yoki tartibini almashtirsangiz, eski natijalar yangi savollarga moslab
+ko'rsatiladi — "kim qaysi savolda xato qilgan" degan tahlil noto'g'ri chiqadi. Bunday holatda
+eski natijalarni oldin Excel'ga saqlab olgan ma'qul.
+
+Administrator har qanday laoshining testini tahrirlay oladi; laoshi esa faqat o'zinikini.
+
 ## 3.6 Qaydlar jurnali va korzinka
 
 ### 🧾 Qaydlar (faqat administrator)
