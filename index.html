@@ -635,6 +635,7 @@ function renderAdmin(){
     ${isAdmin ? `<div class="tab ${adminTab==='alltests'?'on':''}" data-tab="alltests" onclick="setTab('alltests')">📋 Barcha testlar</div>` : ''}
     ${isAdmin ? `<div class="tab ${adminTab==='logs'?'on':''}" data-tab="logs" onclick="setTab('logs')">🧾 Qaydlar</div>` : ''}
     <div class="tab ${adminTab==='trash'?'on':''}" data-tab="trash" onclick="setTab('trash')">🗑 Korzinka</div>
+    ${isAdmin ? `<div class="tab ${adminTab==='backup'?'on':''}" data-tab="backup" onclick="setTab('backup')">💾 Zaxira</div>` : ''}
     <div class="tab ${adminTab==='logins'?'on':''}" data-tab="logins" onclick="setTab('logins')">🔐 Kirishlarim</div>
   </div></div>
   <div id="tabBody"></div>`;
@@ -667,7 +668,7 @@ function renderAnnounceBanner(items){
     </div>`).join('');
 }
 function setTab(t){
-  if((t==='teachers'||t==='announce'||t==='logs'||t==='alltests') && currentProfile.role!=='admin') t = 'tests';
+  if((t==='teachers'||t==='announce'||t==='logs'||t==='alltests'||t==='backup') && currentProfile.role!=='admin') t = 'tests';
   adminTab = t;
   document.querySelectorAll('.tab').forEach(el=>el.classList.toggle('on', el.dataset.tab===t));
   if(t==='tests') renderTestList();
@@ -679,6 +680,7 @@ function setTab(t){
   if(t==='trash') renderTrash();
   if(t==='alltests') renderAllTests();
   if(t==='logins') renderLogins();
+  if(t==='backup') renderBackup();
 }
 function renderAnnounce(){
   $('#tabBody').innerHTML = `
@@ -1415,7 +1417,9 @@ const LOG_LABELS = {
   'auth.login':         '🔑 Tizimga kirdi',
   'auth.logout':        '🚪 Tizimdan chiqdi',
   'auth.password':      '🔑 O‘z parolini almashtirdi',
-  'trash.purge':        '♨️ Korzinkadan butunlay o‘chirdi'
+  'trash.purge':        '♨️ Korzinkadan butunlay o‘chirdi',
+  'backup.download':    '💾 Zaxira nusxa oldi',
+  'backup.restore':     '⬆ Zaxiradan tikladi'
 };
 function logLabel(a){ return LOG_LABELS[a] || a; }
 
@@ -1911,6 +1915,172 @@ function toggleMenu(ev, id){
   if(!wasOpen) el.classList.remove('hidden');
 }
 document.addEventListener('click', closeMenus);
+
+
+/* ================= 💾 ZAXIRA NUSXA (faqat administrator) ================= */
+/* Fayl Firebase Console'ning "Import JSON" tugmasi bilan ham ishlaydigan qilib,
+   bazaning aynan o'zi shaklida saqlanadi — ichiga qo'shimcha maydon qo'shilmaydi. */
+const BACKUP_NODES = ['system','teachers','tests','announcements','trash','logins','logs'];
+
+function bkMsg(msg, type){
+  const el = $('#bk-msg'); if(el) el.innerHTML = msg ? `<div class="note ${type||'green'}">${msg}</div>` : '';
+}
+function bkProgress(msg){
+  const el = $('#bk-prog'); if(el) el.textContent = msg || '';
+}
+async function buildBackup(){
+  const data = {};
+  for(const node of BACKUP_NODES){
+    bkProgress('O‘qilmoqda: ' + node + '…');
+    try {
+      const v = (await db.ref(node).once('value')).val();
+      if(v !== null && v !== undefined) data[node] = v;
+    } catch(e){ console.warn('Zaxira:', node, e.message); }
+  }
+  // Natijalar qoidaga ko'ra faqat har bir test bo'yicha alohida o'qiladi
+  const ids = Object.keys(data.tests || {});
+  const sessions = {};
+  for(let i = 0; i < ids.length; i++){
+    bkProgress(`Natijalar o‘qilmoqda: ${i+1}/${ids.length}`);
+    try {
+      const v = (await db.ref('sessions/'+ids[i]).once('value')).val();
+      if(v) sessions[ids[i]] = v;
+    } catch(e){ /* egasi bo'lmagan test — o'tkazib yuboriladi */ }
+  }
+  if(Object.keys(sessions).length) data.sessions = sessions;
+  bkProgress('');
+  return data;
+}
+function backupStats(d){
+  const n = o => o ? Object.keys(o).length : 0;
+  let sess = 0; Object.values(d.sessions||{}).forEach(v=> sess += n(v));
+  return { teachers:n(d.teachers), tests:n(d.tests), sessions:sess,
+           announcements:n(d.announcements), logs:n(d.logs),
+           trash:Object.values(d.trash||{}).reduce((a,v)=>a+n(v),0),
+           logins:Object.values(d.logins||{}).reduce((a,v)=>a+n(v),0) };
+}
+function statsLine(st){
+  return `${st.teachers} hisob · ${st.tests} test · ${st.sessions} natija · ${st.announcements} e'lon · ${st.logs} qayd · ${st.trash} korzinka · ${st.logins} kirish`;
+}
+async function downloadBackup(silent){
+  const btn = $('#bk-dl');
+  if(btn && !silent){ btn.disabled = true; btn.textContent = 'Tayyorlanmoqda…'; }
+  try {
+    const data = await buildBackup();
+    const st = backupStats(data);
+    const d = new Date();
+    const name = `laoshi-zaxira-${d.getFullYear()}-${p2_(d.getMonth()+1)}-${p2_(d.getDate())}-${p2_(d.getHours())}${p2_(d.getMinutes())}.json`;
+    downloadFile(name, JSON.stringify(data, null, 2), 'application/json');
+    if(!silent) bkMsg(`✅ <b>${esc(name)}</b> yuklab olindi.<br>${esc(statsLine(st))}`, 'green');
+    return true;
+  } catch(e){
+    bkMsg('❌ Zaxira olib bo‘lmadi: ' + esc(e.message), 'red');
+    return false;
+  } finally {
+    if(btn && !silent){ btn.disabled = false; btn.textContent = '⬇ Zaxira nusxani yuklab olish'; }
+    bkProgress('');
+  }
+}
+
+/* ---------- Fayldan tiklash ---------- */
+let restoreData = null;
+function loadRestoreFile(input){
+  const f = input.files && input.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = ()=>{
+    let d;
+    try { d = JSON.parse(String(r.result||'')); }
+    catch(e){ restoreData = null; return bkMsg('❌ Bu to‘g‘ri JSON fayl emas.', 'red'); }
+    if(!d || typeof d !== 'object' || (!d.teachers && !d.tests)){
+      restoreData = null;
+      return bkMsg('❌ Faylda <b>teachers</b> ham, <b>tests</b> ham yo‘q — bu laoshi-test zaxirasi emasga o‘xshaydi.', 'red');
+    }
+    restoreData = d;
+    const st = backupStats(d);
+    $('#bk-restore-info').innerHTML = `
+      <div class="note">Faylda: <b>${esc(statsLine(st))}</b><br>
+      Tiklash <b>ustiga yozadi</b>, o‘chirmaydi: fayldagi yozuvlar bazadagisini almashtiradi,
+      faylda yo‘q narsalar esa joyida qoladi.<br>
+      <b>🧾 Qaydlar jurnali tiklanmaydi</b> — u ataylab faqat qo‘shilishga ochiq, tarixni qayta yozib
+      bo‘lmaydi.</div>
+      <label>Tasdiqlash uchun katta harflarda <span class="code">TIKLASH</span> deb yozing</label>
+      <input id="bk-confirm" placeholder="TIKLASH" autocomplete="off">
+      <div style="margin-top:12px"><button class="btn-red" onclick="doRestore()">⬆ Tiklashni boshlash</button></div>`;
+    bkMsg('');
+  };
+  r.onerror = ()=> bkMsg('❌ Faylni o‘qib bo‘lmadi.', 'red');
+  r.readAsText(f, 'utf-8');
+}
+async function doRestore(){
+  if(!restoreData) return bkMsg('Avval faylni tanlang.', 'red');
+  const c = $('#bk-confirm');
+  if(!c || c.value.trim() !== 'TIKLASH') return bkMsg('Tasdiqlash uchun <b>TIKLASH</b> deb yozing.', 'red');
+  if(!confirm('Tiklashdan oldin hozirgi holat zaxirasi yuklab olinadi. Davom etilsinmi?')) return;
+
+  bkProgress('Ehtiyot uchun hozirgi holat saqlanmoqda…');
+  await downloadBackup(true);
+
+  const d = restoreData;
+  const updates = {};
+  const put = (path, val)=>{ if(val !== undefined) updates[path] = val; };
+  Object.entries(d.system || {}).forEach(([k,v])=> put('system/'+k, v));
+  Object.entries(d.teachers || {}).forEach(([k,v])=> put('teachers/'+k, v));
+  Object.entries(d.tests || {}).forEach(([k,v])=> put('tests/'+k, v));
+  Object.entries(d.announcements || {}).forEach(([k,v])=> put('announcements/'+k, v));
+  Object.entries(d.sessions || {}).forEach(([tid,v])=> put('sessions/'+tid, v));
+  Object.entries(d.trash || {}).forEach(([owner,items])=>
+    Object.entries(items||{}).forEach(([id,v])=> put('trash/'+owner+'/'+id, v)));
+  Object.entries(d.logins || {}).forEach(([uid,items])=>
+    Object.entries(items||{}).forEach(([id,v])=> put('logins/'+uid+'/'+id, v)));
+  // logs ataylab tiklanmaydi — jurnal faqat qo'shilishga ochiq
+
+  const paths = Object.keys(updates);
+  if(!paths.length) return bkMsg('Faylda tiklanadigan narsa topilmadi.', 'red');
+
+  const CHUNK = 300;
+  let doneCount = 0, failed = 0;
+  for(let i = 0; i < paths.length; i += CHUNK){
+    const part = {};
+    paths.slice(i, i+CHUNK).forEach(p=> part[p] = updates[p]);
+    bkProgress(`Yozilmoqda: ${Math.min(i+CHUNK, paths.length)}/${paths.length}`);
+    try { await db.ref().update(part); doneCount += Object.keys(part).length; }
+    catch(e){ failed += Object.keys(part).length; console.warn('Tiklash:', e.message); }
+  }
+  bkProgress('');
+  const st = backupStats(d);
+  logEvent('backup.restore', { note: statsLine(st) + (failed ? ` · ${failed} ta yozuv yozilmadi` : '') });
+  bkMsg(failed
+    ? `⚠️ ${doneCount} ta yozuv tiklandi, ${failed} tasi yozilmadi (qoidalar ruxsat bermagan bo‘lishi mumkin).`
+    : `✅ Tiklandi: ${esc(statsLine(st))}<br>Sahifani yangilang.`, failed ? 'red' : 'green');
+  restoreData = null;
+}
+
+function renderBackup(){
+  $('#tabBody').innerHTML = `
+    <div class="card">
+      <h2>💾 Zaxira nusxa</h2>
+      <p class="muted">Butun baza bitta JSON faylga yoziladi: hisoblar ro'yxati, testlar, o'quvchi
+      natijalari, e'lonlar, qaydlar, korzinka va kirish tarixi. Fayl bazaning aynan o'zi shaklida
+      saqlanadi — kerak bo'lsa uni Firebase Console'dagi <b>Import JSON</b> bilan ham qaytarsa bo'ladi.</p>
+      <div style="margin-top:14px"><button class="btn-red" id="bk-dl" onclick="downloadBackup()">⬇ Zaxira nusxani yuklab olish</button></div>
+      <p class="muted" id="bk-prog" style="margin-top:8px"></p>
+      <div id="bk-msg"></div>
+      <div class="note" style="margin-top:16px"><b>Muhim:</b> kirish hisoblari (email va parollar)
+      bu faylda <b>yo'q</b> — ular Firebase Authentication'da, alohida joyda turadi. Shu bazani
+      boshqa Firebase loyihasiga ko'chirsangiz, laoshilar profili qaytadi, lekin ular tizimga
+      kira olmaydi. Bir loyihaning ichida tiklash esa to'liq ishlaydi.<br>
+      Hisoblarni ham saqlash uchun kompyuterda:
+      <span class="code">firebase auth:export hisoblar.json --project ${esc((window.FIREBASE_CONFIG&&FIREBASE_CONFIG.projectId)||'')}</span></div>
+    </div>
+    <div class="card">
+      <h2>⬆ Fayldan tiklash</h2>
+      <p class="muted">Avval yuklab olingan zaxira faylini tanlang. Tiklash boshlanishidan oldin
+      hozirgi holat ham avtomatik yuklab olinadi — xato bo'lsa orqaga qaytish uchun.</p>
+      <label>Zaxira fayli (.json)</label>
+      <input type="file" id="bk-file" accept=".json,application/json" onchange="loadRestoreFile(this)">
+      <div id="bk-restore-info"></div>
+    </div>`;
+}
 
 /* ---------- LIVE DASHBOARD ---------- */
 function refreshDashSelect(){

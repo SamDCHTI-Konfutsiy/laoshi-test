@@ -375,6 +375,56 @@ Excel eksportiga ham shu qo'shildi: yangi **"Javob berdi"** ustuni va holat ustu
 Ya'ni laoshi faqat o'z kirish tarixini o'qiydi va faqat o'ziga yozadi; administrator hammasini
 ko'radi.
 
+## 3.75 💾 Zaxira nusxa (faqat administrator)
+
+Admin panelidagi **💾 Zaxira** bo'limi butun bazani bitta JSON faylga yozadi: hisoblar ro'yxati,
+testlar, o'quvchi natijalari, e'lonlar, qaydlar jurnali, korzinka va kirish tarixi. Fayl nomida
+sana va soat bo'ladi: `laoshi-zaxira-2026-08-25-1430.json`.
+
+Fayl **bazaning aynan o'zi shaklida** saqlanadi, ichiga qo'shimcha maydon qo'shilmaydi. Shuning
+uchun uni Firebase Console → Realtime Database → **⋮ → Import JSON** orqali ham qaytarsa bo'ladi.
+
+### Kirish hisoblari bu faylda YO'Q
+
+Bu eng muhim nuqta. Email va parollar **Firebase Authentication**'da turadi — u Realtime Database
+emas, butunlay alohida xizmat. Ya'ni:
+
+- **Bir loyihaning ichida tiklash** — to'liq ishlaydi. Kimdir tasodifan hamma testni o'chirib
+  yuborsa, zaxiradan qaytarasiz va hamma o'z hisobi bilan kiraveradi.
+- **Boshqa Firebase loyihasiga ko'chirish** — yarim ishlaydi. Laoshilar profili, testlar va
+  natijalar qaytadi, lekin hech kim tizimga kira olmaydi: profil `uid` ga bog'langan, o'sha `uid`
+  li hisob yangi loyihada mavjud emas.
+
+Hisoblarni ham saqlash uchun kompyuterda Firebase CLI kerak:
+
+```
+npm install -g firebase-tools
+firebase login
+firebase auth:export hisoblar.json --project laoshi-test-8becd
+```
+
+Qaytarish `firebase auth:import hisoblar.json --project ...` bilan. Baza JSON'i + hisoblar JSON'i
+birgalikda to'liq zaxira bo'ladi.
+
+### Fayldan tiklash
+
+**⬆ Fayldan tiklash** bo'limida faylni tanlaysiz, ichida nima borligi ko'rsatiladi, so'ng
+tasdiqlash uchun katta harflarda `TIKLASH` deb yozasiz. Tugmani bosganingizda tizim avval
+**hozirgi holatni avtomatik yuklab oladi** — xato qilsangiz orqaga qaytish uchun.
+
+Tiklash **ustiga yozadi, o'chirmaydi**: fayldagi yozuvlar bazadagisini almashtiradi, faylda
+bo'lmagan narsalar joyida qolaveradi. Ya'ni zaxiradan keyin yaratilgan test yo'qolmaydi.
+
+**Qaydlar jurnali tiklanmaydi** — bu ataylab shunday. Jurnal qoidalarda faqat qo'shilishga ochiq
+qilingan, tarixni qayta yozib bo'lmaydi. Zaxira faylida qaydlar saqlanadi (o'qib ko'rish uchun),
+lekin bazaga qaytarilmaydi.
+
+### Qanchalik tez-tez olish kerak
+
+Bepul (Spark) rejada Firebase avtomatik kunlik zaxira qilmaydi — faqat qo'lda. Amaliy maslahat:
+har chorak yakunida, katta imtihondan oldin va laoshilar ro'yxatini o'zgartirishdan oldin
+zaxira olib qo'ying. Fayl kichik, joy egallamaydi.
+
 ## 3.8 Panel ko'rinishi
 
 Panel qayta ishlandi:
