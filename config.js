@@ -23,4 +23,4 @@ window.SUPER_ADMIN_EMAILS = ["unar00@mail.ru"];   // masalan: ["direktor@maktab.
 
 // Ixtiyoriy: "111111ga majburiy tiklash" tugmasi uchun kerak. README'dagi
 // "Majburiy parol reset (Apps Script)" bo'limini bajargach, shu yerga Web App URL'ni qo'ying.
-window.APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyxLskzMl_V3O-hRsAfqGS5GdtMA8uhCHe_1xTn6Kvq5tTX7erviXs_4iNQ8JD24dKQTA/exec";  // masalan: "https://script.google.com/macros/s/AKfycb.../exec"
+window.APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx9FsrcwW9E188Yk0vWwg9nPdEA-cUMrxSjdbaAclj12NTEt4SRsO7v7gmnAythCPHOyg/exec";  // masalan: "https://script.google.com/macros/s/AKfycb.../exec"
