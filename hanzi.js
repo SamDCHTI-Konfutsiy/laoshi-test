@@ -52,6 +52,15 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hz-style">
 .hz-sticky{position:sticky;bottom:0;z-index:40;background:rgba(246,245,241,.95);backdrop-filter:blur(8px);
   border-top:1px solid var(--line);padding:10px 0;margin-top:10px}
 .hz-codes td{font-family:ui-monospace,monospace}
+.hz-present{position:fixed;inset:0;z-index:300;background:#FBFAF6;display:flex;flex-direction:column}
+.hz-present .hp-top{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--line)}
+.hz-present .hp-mid{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;padding:16px;cursor:pointer;user-select:none}
+.hz-present .hp-num{font-size:clamp(40px,9vw,84px);font-weight:800;color:var(--red);line-height:1}
+.hz-present .hp-han{font-size:clamp(80px,22vw,230px);line-height:1.05}
+.hz-present .hp-pin{font-size:clamp(22px,5vw,46px)}
+.hz-present .hp-tr{font-size:clamp(16px,3.5vw,28px);color:var(--ink-soft)}
+.hz-present .hp-bot{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;padding:12px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
+.hz-present .hp-bot button{min-width:110px}
 @media print{ body *{visibility:hidden} .hz-print, .hz-print *{visibility:visible} .hz-print{position:absolute;left:0;top:0;width:100%} }
 </style>`);
 
@@ -59,8 +68,8 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hz-style">
 const TYPES = ['writing','hanzi_input','pinyin','translation','dictation'];
 const TYPE_LABEL = { writing:'✍️ Hanzi yozish', hanzi_input:'⌨️ Hanzi kiritish', pinyin:'🔤 Pinyin', translation:'🌐 Tarjima', dictation:'🔊 Diktant' };
 const TYPE_HELP = {
-  writing:"Pinyin va ma'no ko'rsatiladi, o'quvchi ieroglifni chizadi — HanziWriter chiziqlar tartibini tekshiradi.",
-  hanzi_input:"Pinyin va ma'no ko'rsatiladi, o'quvchi ieroglifni klaviaturada (xitoycha pinyin klaviatura) yozadi.",
+  writing:"O'quvchi ieroglifni chizadi — HanziWriter chiziqlar tartibini tekshiradi. Nima ko'rinishini pastda tanlaysiz.",
+  hanzi_input:"O'quvchi ieroglifni klaviaturada (xitoycha pinyin klaviatura) yozadi. Nima ko'rinishini pastda tanlaysiz.",
   pinyin:"Ieroglif va ma'no ko'rsatiladi, o'quvchi pinyinni yozadi (nǐ hǎo yoki ni3 hao3 — ikkalasi qabul qilinadi).",
   translation:"Ieroglif va pinyin ko'rsatiladi, o'quvchi o'zbekcha tarjimasini yozadi.",
   dictation:"So'z qurilma ovozida o'qib beriladi, o'quvchi ieroglifda yozadi."
@@ -71,7 +80,7 @@ const STATUS = {
   needs_revision:{t:"Qayta ishlash kerak", p:'p-red'}, reviewed:{t:"Tekshirildi", p:'p-green'}
 };
 const VERDICT = { correct:{t:"To'g'ri", p:'p-green'}, incorrect:{t:"Noto'g'ri", p:'p-red'}, unanswered:{t:"Laoshi tekshiradi", p:'p-gray'} };
-const MAX_WORDS = 40;
+const MAX_WORDS = 60;
 const HW_URL = 'https://cdn.jsdelivr.net/npm/hanzi-writer@3.5/dist/hanzi-writer.min.js';
 const HW_DATA = 'https://cdn.jsdelivr.net/npm/hanzi-writer-data@2.0';
 const CODE_ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -363,7 +372,7 @@ function attach(){
   }, e=> onErr(e,'hanziGroups'));
   H.refs = [aRef, wRef, gRef];
 }
-HZ.detach = ()=>{ (H.refs||[]).forEach(r=>r.off()); H.refs=[]; H.attachedFor=null; if(H.detailRefs){ H.detailRefs.forEach(r=>r.off()); H.detailRefs=null; } };
+HZ.detach = ()=>{ if(H.pres) HZ.presClose(); (H.refs||[]).forEach(r=>r.off()); H.refs=[]; H.attachedFor=null; if(H.detailRefs){ H.detailRefs.forEach(r=>r.off()); H.detailRefs=null; } };
 function onErr(e, node){
   console.warn(node, e);
   H.err = `<div class="note red"><b>${esc(node)}</b> o'qilmadi: ${esc(e.message)}<br>
@@ -496,6 +505,7 @@ function wordKey(w){ return (w.hanzi||'').trim()+'|'+String(w.pinyin||'').toLowe
 function hskChips(cur, fn){
   return `<div style="margin-top:8px">${[0,...HSK].map(l=>`<span class="hz-chip ${cur===l?'on':''}" onclick="${fn}(${l})">${l?'HSK '+l:'Barchasi'}</span>`).join('')}</div>`;
 }
+const WORDS_SHOWN = 300;   // katta bazada (HSK 1–6 ≈ 5000 so'z) sahifa qotib qolmasligi uchun
 function drawWords(){
   const all = Object.entries(H.words);
   const rows = all.filter(([,w])=> (!H.whsk || w.hsk===H.whsk) && (!H.wmine || w.ownerUid===me()) && wordMatch(w, H.wq))
@@ -521,10 +531,10 @@ function drawWords(){
       ${hskChips(H.whsk,'HZ.setWhsk')}
     </div>
     <div class="card">
-      <p class="muted" style="margin-bottom:8px">${rows.length} / ${all.length} ta so'z</p>
+      <p class="muted" style="margin-bottom:8px">${rows.length} / ${all.length} ta so'z${rows.length>WORDS_SHOWN?` · birinchi ${WORDS_SHOWN} tasi ko'rsatilmoqda — qidiruv yoki HSK filtri bilan toraytiring`:''}</p>
       ${!H.wLoaded ? '<p class="muted">Yuklanmoqda…</p>' : !rows.length ? `<div class="empty"><span class="ico">📖</span>So'z topilmadi.</div>` :
       `<div class="tbl"><table><tr><th>Hanzi</th><th>Pinyin</th><th>Tarjima</th><th>HSK</th><th>Muallif</th><th></th></tr>
-      ${rows.map(([id,w])=>{
+      ${rows.slice(0, WORDS_SHOWN).map(([id,w])=>{
         const can = isAdmin() || w.ownerUid===me();
         return `<tr><td class="hz-han" style="font-size:24px">${esc(w.hanzi)}</td><td>${esc(w.pinyin)}</td>
           <td>${esc(w.translation)}${(w.altTranslations||[]).length?`<br><span class="muted">${esc(w.altTranslations.join('; '))}</span>`:''}</td>
@@ -745,15 +755,37 @@ HZ.printCodes = gid=>{
 };
 
 /* ---------------- 5.4 Topshiriq yaratish / tahrirlash ---------------- */
-function itemFor(word, type){
+const SHOW_DEFAULT = {hanzi:false, pinyin:true, translation:true};
+/* show — yozish/kiritish savollarida o'quvchiga nima ko'rinadi (laoshi tanlaydi). Hammasi o'chiq = laoshi o'zi aytadi. */
+function itemFor(word, type, show){
   const chars = [...String(word.hanzi).replace(/\s/g,'')];
+  const sh = show || SHOW_DEFAULT, P = word.pinyin || null, T = word.translation || null;
   const base = { type, wordId:word.id, charCount:chars.length, showHanzi:null, showPinyin:null, showTranslation:null, target:null };
-  const key = { hanzi:word.hanzi, pinyin:word.pinyin, translation:word.translation, accepted:[word.hanzi] };
-  if(type==='writing')     return {item:{...base, showPinyin:word.pinyin, showTranslation:word.translation, target:chars.join('')}, key};
-  if(type==='hanzi_input') return {item:{...base, showPinyin:word.pinyin, showTranslation:word.translation}, key};
-  if(type==='pinyin')      return {item:{...base, showHanzi:word.hanzi, showTranslation:word.translation}, key:{...key, accepted:[word.pinyin, ...(word.altPinyin||[])]}};
-  if(type==='translation') return {item:{...base, showHanzi:word.hanzi, showPinyin:word.pinyin}, key:{...key, accepted:[word.translation, ...splitAlt(word.translation), ...(word.altTranslations||[])]}};
+  const key = { hanzi:word.hanzi, pinyin:P, translation:T, accepted:[word.hanzi] };
+  const vis = { showHanzi: sh.hanzi ? word.hanzi : null, showPinyin: sh.pinyin ? P : null, showTranslation: sh.translation ? T : null };
+  if(type==='writing')     return {item:{...base, ...vis, target:chars.join('')}, key};
+  if(type==='hanzi_input') return {item:{...base, ...vis}, key};
+  if(type==='pinyin')      return P ? {item:{...base, showHanzi:word.hanzi, showTranslation:T}, key:{...key, accepted:[P, ...(word.altPinyin||[])]}} : null;
+  if(type==='translation') return T ? {item:{...base, showHanzi:word.hanzi, showPinyin:P}, key:{...key, accepted:[T, ...splitAlt(T), ...(word.altTranslations||[])]}} : null;
   return {item:{...base, target:word.hanzi}, key};   // dictation: matn ovozli o'qish uchun kerak
+}
+/* Savollar: tur bo'yicha, har turda so'zlar tanlangan tartibda. Pinyin/tarjimasi yo'q so'zga o'sha tur tuzilmaydi. */
+function planItems(words, types, show){
+  const items = {}, keys = {}; let n = 0;
+  types.forEach(t=> words.forEach(w=>{ const b = itemFor(w, t, show); if(!b) return; const k='i'+String(n++).padStart(3,'0'); items[k]=b.item; keys[k]=b.key; }));
+  return {items, keys, n};
+}
+/* Tahrirlashdagi so'z: bazadan yoki faqat shu topshiriqqa ro'yxatdan qo'shilgan (L…) */
+const EW = id => (H.ed && H.ed.local && H.ed.local[id]) || H.words[id];
+function edShow(){
+  const c = id=>{ const el=document.getElementById(id); return el ? el.checked : null; };
+  if(c('e-sh-h')===null) return (H.editId && H.assignments[H.editId] && H.assignments[H.editId].showOnWrite) || SHOW_DEFAULT;
+  return {hanzi:c('e-sh-h'), pinyin:c('e-sh-p'), translation:c('e-sh-t')};
+}
+function edWords(){
+  return H.ed.words.filter(EW).map(id=>{ const w = EW(id);
+    if(!H.ed.local[id]) return Object.assign({id}, w);
+    return Object.assign({id}, w, {pinyin:toMarks(String(w.pinyin||'').trim()), translation:String(w.translation||'').trim()}); });
 }
 function drawEdit(){
   const id = H.editId, a = id ? H.assignments[id] : null;
@@ -763,6 +795,7 @@ function drawEdit(){
     _for: id||'new',
     words: a ? (a.wordIds||[]).slice() : [],
     types: a ? Object.keys(a.exerciseTypes||{}) : ['writing','pinyin','translation'],
+    local: a && a.localWords ? JSON.parse(JSON.stringify(a.localWords)) : {},
     q:'', hsk:0
   };
   const dl = ms=>{ if(!ms) return ''; const d=new Date(ms), p=x=>String(x).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
@@ -791,10 +824,25 @@ function drawEdit(){
     ${locked ? '' : `<div class="row"><div><label>Bazadan qidirish</label><input id="hz-eq" value="${esc(H.ed.q)}" placeholder="汉字, pinyin, ma'no yoki teg" oninput="HZ.edQ(this.value)"></div>
       <div style="flex:0 0 auto"><label>&nbsp;</label><button class="btn-ghost" onclick="HZ.wordForm(null, HZ.edAddNew)">➕ Yangi so'z</button></div></div>
       <div id="e-hsk"></div>
-      <div id="hz-pick" class="hz-wordpick" style="margin-top:8px"></div>`}
+      <div id="hz-pick" class="hz-wordpick" style="margin-top:8px"></div>
+      <label style="margin-top:14px">📋 Ro'yxatdan qo'shish <span class="muted" style="font-weight:400">— faqat shu topshiriqqa, so'zlar bazasiga qo'shilmaydi</span></label>
+      <textarea id="e-bulk" rows="3" class="hz-han" style="font-size:18px" placeholder="你好&#10;老师, 谢谢, 再见 …"></textarea>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px"><button class="btn-ghost btn-sm" onclick="HZ.edBulk()">➕ Ro'yxatni qo'shish</button>
+        <span class="muted" style="font-size:13px">Har qatorga bitta so'z yoki vergul/bo'sh joy bilan ajrating. Bazada bor so'zning pinyin va tarjimasi o'zi to'ldiriladi.</span></div>
+      <div id="e-bulkmsg"></div>
+      <div id="e-local"></div>`}
 
     <h3 style="margin-top:20px">3. Mashq turlari</h3>
     ${TYPES.map(t=>`<label class="hz-check"><input type="checkbox" class="e-type" value="${t}" ${H.ed.types.includes(t)?'checked':''} ${locked?'disabled':''} onchange="HZ.edTypes()"><span><b>${TYPE_LABEL[t]}</b><br><span class="muted">${TYPE_HELP[t]}</span></span></label>`).join('')}
+    <div style="margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff">
+      <b>✍️⌨️ Yozish va kiritishda o'quvchiga ko'rinadi:</b>
+      <div style="display:flex;gap:16px;flex-wrap:wrap">
+        <label class="hz-check"><input type="checkbox" id="e-sh-h" ${v('showOnWrite',SHOW_DEFAULT).hanzi?'checked':''} ${locked?'disabled':''}> Ieroglif (namuna — ko'chirib yozadi)</label>
+        <label class="hz-check"><input type="checkbox" id="e-sh-p" ${v('showOnWrite',SHOW_DEFAULT).pinyin?'checked':''} ${locked?'disabled':''}> Pinyin</label>
+        <label class="hz-check"><input type="checkbox" id="e-sh-t" ${v('showOnWrite',SHOW_DEFAULT).translation?'checked':''} ${locked?'disabled':''}> Tarjima</label>
+      </div>
+      <p class="muted" style="margin-top:6px">Hammasini o'chirsangiz, o'quvchi faqat savol raqamini ko'radi — so'zni siz o'zingiz aytasiz ("1 — hǎo"). Buning uchun topshiriq sahifasida <b>🎤 Laoshi diktanti</b> tugmasi so'zlarni ketma-ket ochib beradi.</p>
+    </div>
     <p class="muted" style="margin-top:8px" id="e-ic"></p>
 
     <h3 style="margin-top:20px">4. Sozlamalar</h3>
@@ -836,12 +884,21 @@ function drawSel(){
   const el = $('#e-sel'); if(!el) return;
   const a = H.editId ? H.assignments[H.editId] : null; const locked = !!(a && a.status!=='draft');
   $('#e-wc').textContent = `(${H.ed.words.length}/${MAX_WORDS})`;
-  const missing = H.ed.words.filter(w=>!H.words[w]).length;
-  el.innerHTML = (!H.ed.words.length ? `<p class="muted">Hali so'z tanlanmagan — pastdan qidirib bosing.</p>` :
-    H.ed.words.map((wid,i)=>{ const w = H.words[wid];
-      return `<span class="hz-chip on">${w?`<b class="hz-han" style="font-size:18px">${esc(w.hanzi)}</b> ${esc(w.pinyin)}`:'<i>o‘chirilgan so‘z</i>'}
+  const missing = H.ed.words.filter(w=>!EW(w)).length;
+  el.innerHTML = (!H.ed.words.length ? `<p class="muted">Hali so'z tanlanmagan — pastdan qidirib bosing yoki ro'yxatni joylang.</p>` :
+    H.ed.words.map((wid,i)=>{ const w = EW(wid);
+      return `<span class="hz-chip on" ${H.ed.local[wid]?'title="Faqat shu topshiriqda (bazada emas)"':''}><span class="muted">${i+1}.</span>${w?`<b class="hz-han" style="font-size:18px">${esc(w.hanzi)}</b> ${esc(w.pinyin||'')}${H.ed.local[wid]?' 📋':''}`:'<i>o‘chirilgan so‘z</i>'}
         ${locked?'':`<a onclick="HZ.edMove(${i},-1)" style="cursor:pointer">‹</a><a onclick="HZ.edMove(${i},1)" style="cursor:pointer">›</a><a onclick="HZ.edRm(${i})" style="cursor:pointer;color:var(--red)">✕</a>`}</span>`; }).join(''))
     + (missing && !locked ? `<div class="note">${missing} ta tanlangan so'z bazadan o'chirilgan — saqlashda tushib qoladi.</div>` : '');
+  const lel = $('#e-local');
+  if(lel){
+    const loc = H.ed.words.filter(id=>H.ed.local[id]);
+    lel.innerHTML = !loc.length ? '' : `<p class="muted" style="margin-top:10px">📋 Ro'yxatdan qo'shilganlar — pinyin va tarjima ixtiyoriy (bo'sh bo'lsa, o'sha so'zga "Pinyin"/"Tarjima" savoli tuzilmaydi):</p>
+      <div class="tbl"><table><tr><th>#</th><th>Hanzi</th><th>Pinyin</th><th>Tarjima</th></tr>
+      ${loc.map(id=>{ const w=H.ed.local[id]; return `<tr><td class="muted">${H.ed.words.indexOf(id)+1}</td><td class="hz-han" style="font-size:22px;white-space:nowrap">${esc(w.hanzi)}</td>
+        <td><input value="${esc(w.pinyin||'')}" placeholder="ni3 hao3" autocapitalize="none" spellcheck="false" oninput="HZ.edLocal('${id}','pinyin',this.value)"></td>
+        <td><input value="${esc(w.translation||'')}" placeholder="ma'nosi" oninput="HZ.edLocal('${id}','translation',this.value)"></td></tr>`; }).join('')}</table></div>`;
+  }
   HZ.edTypes();
 }
 function drawPicker(){
@@ -859,7 +916,31 @@ HZ.edAddNew = id=> HZ.edAdd(id);
 HZ.edRm = i=>{ H.ed.words.splice(i,1); drawSel(); drawPicker(); };
 HZ.edMove = (i,d)=>{ const j=i+d, w=H.ed.words; if(j<0||j>=w.length) return; [w[i],w[j]]=[w[j],w[i]]; drawSel(); };
 HZ.edTypes = ()=>{ const el=$('#e-ic'); if(H.ed && document.querySelector('.e-type')) H.ed.types = [...document.querySelectorAll('.e-type:checked')].map(x=>x.value);
-  if(el) el.textContent = `Jami savollar: ${H.ed.words.filter(w=>H.words[w]).length} so'z × ${H.ed.types.length} tur = ${H.ed.words.filter(w=>H.words[w]).length*H.ed.types.length}`; };
+  if(!el) return;
+  const ws = edWords(), n = planItems(ws, TYPES.filter(t=>H.ed.types.includes(t)), SHOW_DEFAULT).n, full = ws.length*H.ed.types.length;
+  el.textContent = `Jami savollar: ${ws.length} so'z × ${H.ed.types.length} tur = ${n}` + (n<full ? ` (${full-n} tasi tuzilmaydi — pinyin yoki tarjimasi yo'q)` : ''); };
+HZ.edLocal = (id, f, val)=>{ const w = H.ed.local[id]; if(!w) return; w[f] = val; if(f==='pinyin') w.altPinyin = []; if(f==='translation') w.altTranslations = []; HZ.edTypes(); };
+HZ.edBulk = ()=>{
+  const ta = $('#e-bulk'), msg = m=>{ $('#e-bulkmsg').innerHTML = m; };
+  const toks = String(ta.value||'').split(/[\s,，、;；|/.。]+/).map(t=>[...t].filter(c=>/\p{Script=Han}/u.test(c)).join('')).filter(Boolean);
+  if(!toks.length) return msg(`<div class="note red">Xitoycha so'z topilmadi.</div>`);
+  const have = new Set(H.ed.words.map(id=>(EW(id)||{}).hanzi));
+  let add=0, found=0; const dup=[], rest=[];
+  toks.forEach(h=>{
+    if(have.has(h)){ dup.push(h); return; }
+    if(H.ed.words.length>=MAX_WORDS || [...h].length>16){ rest.push(h); return; }
+    const b = Object.values(H.words).filter(w=>w.hanzi===h).sort((x,y)=>(x.hsk||99)-(y.hsk||99))[0];
+    const id = 'L'+rnd(9);
+    H.ed.local[id] = { hanzi:h, pinyin:b?b.pinyin:'', translation:b?b.translation:'', altPinyin:(b&&b.altPinyin)||[], altTranslations:(b&&b.altTranslations)||[] };
+    if(b) found++;
+    H.ed.words.push(id); have.add(h); add++;
+  });
+  ta.value = rest.join('\n');
+  msg(`<div class="note ${add?'green':''}">✅ ${add} ta so'z qo'shildi${found?` (${found} tasining pinyin/tarjimasi bazadan olindi)`:''}.`
+    + (dup.length?`<br>Takror — o'tkazib yuborildi: <span class="hz-han">${esc(dup.join('、'))}</span>`:'')
+    + (rest.length?`<br>Sig'madi (bitta topshiriqda ko'pi bilan ${MAX_WORDS} ta so'z) — qutida qoldi.`:'') + `</div>`);
+  drawSel(); drawPicker();
+};
 
 HZ.saveA = ()=>{
   const id = H.editId, old = id ? H.assignments[id] : null, locked = !!(old && old.status!=='draft');
@@ -884,17 +965,21 @@ HZ.saveA = ()=>{
     if($('#e-pick').checked){ allowed = {}; document.querySelectorAll('.e-stu:checked').forEach(x=> allowed[x.value]=true);
       if(!Object.keys(allowed).length) return err("Kamida bitta o'quvchini tanlang"); }
   }
-  const words = H.ed.words.filter(w=>H.words[w]).map(w=>Object.assign({id:w}, H.words[w]));
+  const words = edWords();
+  const show = edShow();
   const types = TYPES.filter(t=>H.ed.types.includes(t));
   if(!words.length) return err("Kamida bitta so'z tanlang");
   if(!types.length) return err('Kamida bitta mashq turini tanlang');
-  const items = {}, keys = {}; let n = 0;
-  types.forEach(t=> words.forEach(w=>{ const k='i'+String(n++).padStart(3,'0'); const b=itemFor(w,t); items[k]=b.item; keys[k]=b.key; }));
+  const {items, keys, n} = planItems(words, types, show);
+  if(!n) return err("Savol tuzilmadi: tanlangan so'zlarda pinyin/tarjima yo'q — yozish yoki kiritish turini tanlang");
+  const localWords = {};
+  words.forEach(w=>{ if(H.ed.local[w.id]){ const {id, ...rest} = w; localWords[id] = rest; } });
   const instant = $('#e-instant').checked;
   const aid = id || rnd(8);
   const rec = Object.assign({}, common, {
     access, groupId, groupName, allowed,
     exerciseTypes: Object.fromEntries(types.map(t=>[t,true])), wordIds: words.map(w=>w.id), itemCount:n, items,
+    showOnWrite: show, localWords: Object.keys(localWords).length ? localWords : null,
     gridType:$('#e-grid').value, tolerance:Math.max(0, Math.round(+$('#e-tol').value||0)), requireTones:$('#e-tones').checked,
     instantCheck: instant, publicKeys: instant ? keys : null,
     status: old ? old.status : 'draft',
@@ -974,6 +1059,7 @@ function drawDetail(){
         ${a.instructions?`<p style="margin-top:6px">${esc(a.instructions)}</p>`:''}</div>
       <div class="lrow-act">
         ${a.status==='draft'?`<button class="btn-red btn-sm" onclick="HZ.publish('${aid}')">📣 E'lon qilish</button>`:''}
+        <button class="btn-ghost btn-sm" onclick="HZ.present('${aid}')">🎤 Laoshi diktanti</button>
         <button class="btn-ghost btn-sm" onclick="HZ.exportA('${aid}')">⬇ Excel</button>
         ${menuHtml('hzd-'+aid, [
           {label:'✏️ Tahrirlash', fn:`HZ.go('edit','${aid}')`},
@@ -1038,9 +1124,56 @@ HZ.exportA = aid=>{
   else downloadFile('hanzi.csv', '\uFEFF'+data.map(r=>r.map(csvCell).join(',')).join('\r\n'), 'text/csv;charset=utf-8');
 };
 
+/* ---------------- 5.5b Laoshi diktanti: so'zlar ketma-ket, katta harfda ---------------- */
+HZ.present = aid=>{
+  const a = H.assignments[aid]; if(!a) return;
+  const keys = H.detailFor===aid && H.keys ? H.keys : a.publicKeys;
+  if(!keys || !Object.keys(keys).length) return alert("Javob kalitlari hali yuklanmadi — bir soniyadan keyin qayta bosing.");
+  const ids = itemKeys(a.items);
+  // o'quvchi ieroglifni ko'rmaydigan savollar (yozish/kiritish/diktant); raqam — o'quvchi ekranidagi raqam
+  const list = ids.map((k,i)=>({k, num:i+1, it:a.items[k], key:keys[k]||{}})).filter(x=>!x.it.showHanzi);
+  if(!list.length) return alert("Bu topshiriqda aytib beriladigan savol yo'q (hamma savolda ieroglif ko'rinadi).");
+  H.pres = {aid, list, i:0, hide:false};
+  document.body.insertAdjacentHTML('beforeend', `<div class="hz-present" id="hz-pres"></div>`);
+  document.addEventListener('keydown', presKey);
+  drawPres();
+};
+function presKey(e){
+  if(!H.pres) return;
+  if(e.key==='ArrowRight' || e.key===' ' || e.key==='PageDown'){ e.preventDefault(); HZ.presGo(1); }
+  else if(e.key==='ArrowLeft' || e.key==='PageUp'){ e.preventDefault(); HZ.presGo(-1); }
+  else if(e.key==='Escape') HZ.presClose();
+}
+function drawPres(){
+  const el = $('#hz-pres'), P = H.pres; if(!el || !P) return;
+  const a = H.assignments[P.aid], x = P.list[P.i], k = x.key;
+  el.innerHTML = `
+    <div class="hp-top"><div><b>${esc(a.title)}</b> <span class="muted">· ${P.i+1} / ${P.list.length}</span></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <label class="hz-check" style="margin:0"><input type="checkbox" ${P.hide?'checked':''} onchange="HZ.presHide(this.checked)"> Sinf ekrani (so'zni yashirish)</label>
+        <button class="btn-ghost btn-sm" onclick="HZ.presClose()">✕</button></div></div>
+    <div class="hp-mid" onclick="HZ.presGo(1)">
+      <div class="hp-num">${x.num}</div>
+      <div class="muted">${TYPE_LABEL[x.it.type]||''}</div>
+      ${P.hide ? `<div class="hp-tr" style="margin-top:20px">Tinglang va yozing…</div>` : `
+      <div class="hp-han hz-han">${esc(k.hanzi||'')}</div>
+      ${k.pinyin?`<div class="hp-pin">${esc(k.pinyin)}</div>`:''}
+      ${k.translation?`<div class="hp-tr">${esc(k.translation)}</div>`:''}`}
+    </div>
+    <div class="hp-bot">
+      <button class="btn-ghost" onclick="HZ.presGo(-1)" ${P.i?'':'disabled'}>◀ Oldingi</button>
+      <button class="btn-ghost" onclick="HZ.presSay()">🔊 Ovoz</button>
+      <button class="btn-red" onclick="HZ.presGo(1)" ${P.i<P.list.length-1?'':'disabled'}>Keyingi ▶</button>
+    </div>`;
+}
+HZ.presGo = d=>{ const P=H.pres; if(!P) return; const j=P.i+d; if(j<0||j>=P.list.length) return; P.i=j; drawPres(); };
+HZ.presHide = v=>{ if(H.pres){ H.pres.hide=!!v; drawPres(); } };
+HZ.presSay = ()=>{ const P=H.pres; if(!P) return; const k=P.list[P.i].key; if(k.hanzi && !speak(k.hanzi, 0.8)) alert("Bu brauzerda ovoz yo'q."); };
+HZ.presClose = ()=>{ document.removeEventListener('keydown', presKey); H.pres=null; const el=$('#hz-pres'); if(el) el.remove(); };
+
 /* ---------------- 5.6 Bitta ishni tekshirish ---------------- */
 function promptHtml(it){
-  return `${it.showHanzi?`<span class="hz-han hz-big">${esc(it.showHanzi)}</span> `:''}${it.showPinyin?`<span style="font-size:18px">${esc(it.showPinyin)}</span> `:''}${it.showTranslation?`<span class="muted">«${esc(it.showTranslation)}»</span>`:''}${it.type==='dictation'?'<span class="muted">Tinglang va ieroglifda yozing</span>':''}`;
+  return `${it.showHanzi?`<span class="hz-han hz-big">${esc(it.showHanzi)}</span> `:''}${it.showPinyin?`<span style="font-size:18px">${esc(it.showPinyin)}</span> `:''}${it.showTranslation?`<span class="muted">«${esc(it.showTranslation)}»</span>`:''}${it.type==='dictation'?'<span class="muted">Tinglang va ieroglifda yozing</span>':''}${(it.type==='writing'||it.type==='hanzi_input') && !it.showHanzi && !it.showPinyin && !it.showTranslation ? '<span class="muted">🎤 Laoshi aytadi — tinglang va yozing</span>':''}`;
 }
 function answerHtml(it, ans, gridType, ghost){
   if(!ans || (!ans.text && !ans.freehand && !(ans.writing||[]).some(w=>w&&w.strokes))) return `<span class="muted">Javob yo'q</span>`;
