@@ -1,0 +1,125 @@
+{
+  "rules": {
+    "system": {
+      ".read": true,
+      "bootstrapped": {
+        ".write": "auth != null && (!data.exists() || root.child('teachers').child(auth.uid).child('role').val() === 'admin')"
+      }
+    },
+    "teachers": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && ( auth.uid === $uid || root.child('teachers').child(auth.uid).child('role').val() === 'admin' || !root.child('teachers').exists() )"
+      }
+    },
+    "announcements": {
+      ".read": "auth != null",
+      "$id": {
+        ".write": "auth != null && root.child('teachers').child(auth.uid).child('role').val() === 'admin'"
+      }
+    },
+    "tests": {
+      ".read": true,
+      ".indexOn": ["ownerUid", "shared", "sourceTestId"],
+      "$testId": {
+        ".write": "auth != null && root.child('teachers').child(auth.uid).child('active').val() !== false && (!data.exists() || data.child('ownerUid').val() === auth.uid || root.child('teachers').child(auth.uid).child('role').val() === 'admin')"
+      }
+    },
+    "sessions": {
+      "$testId": {
+        ".read": "auth != null && root.child('teachers').child(auth.uid).child('active').val() !== false && (root.child('tests').child($testId).child('ownerUid').val() === auth.uid || root.child('teachers').child(auth.uid).child('role').val() === 'admin')",
+        ".write": "auth != null && root.child('teachers').child(auth.uid).child('role').val() === 'admin'",
+        "$sid": {
+          ".read": true,
+          ".write": true
+        }
+      }
+    },
+    "logs": {
+      ".read": "root.child('teachers').child(auth.uid).child('role').val() === 'admin'",
+      ".indexOn": ["at"],
+      "$logId": {
+        ".write": "auth != null && (!data.exists() || root.child('teachers').child(auth.uid).child('role').val() === 'admin')"
+      }
+    },
+    "trash": {
+      ".read": "root.child('teachers').child(auth.uid).child('role').val() === 'admin'",
+      "$owner": {
+        ".read": "auth != null && auth.uid === $owner",
+        ".write": "auth != null && (auth.uid === $owner || root.child('teachers').child(auth.uid).child('role').val() === 'admin')"
+      }
+    },
+    "logins": {
+      ".read": "auth != null && root.child('teachers').child(auth.uid).child('role').val() === 'admin'",
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('teachers').child(auth.uid).child('role').val() === 'admin')",
+        "$id": {
+          ".write": "auth != null && (auth.uid === $uid || root.child('teachers').child(auth.uid).child('role').val() === 'admin')"
+        }
+      }
+    },
+
+    "hanziWords": {
+      ".read": "auth != null && root.child('teachers').child(auth.uid).exists() && root.child('teachers').child(auth.uid).child('active').val() !== false",
+      ".indexOn": ["ownerUid", "hsk"],
+      "$wid": {
+        ".write": "auth != null && root.child('teachers').child(auth.uid).exists() && root.child('teachers').child(auth.uid).child('active').val() !== false && (!data.exists() || data.child('ownerUid').val() === auth.uid || root.child('teachers').child(auth.uid).child('role').val() === 'admin')",
+        ".validate": "newData.child('hanzi').isString() && newData.child('hanzi').val().length > 0 && newData.child('hanzi').val().length <= 16 && (newData.child('ownerUid').val() === auth.uid || (data.exists() && newData.child('ownerUid').val() === data.child('ownerUid').val()))"
+      }
+    },
+    "hanziGroups": {
+      ".read": "auth != null && root.child('teachers').child(auth.uid).child('role').val() === 'admin'",
+      "$owner": {
+        ".read": "auth != null && auth.uid === $owner",
+        "$gid": {
+          ".write": "auth != null && root.child('teachers').child(auth.uid).exists() && root.child('teachers').child(auth.uid).child('active').val() !== false && (auth.uid === $owner || root.child('teachers').child(auth.uid).child('role').val() === 'admin')"
+        }
+      }
+    },
+    "hanziRoster": {
+      "$gid": {
+        ".write": "auth != null && root.child('teachers').child(auth.uid).exists() && root.child('teachers').child(auth.uid).child('active').val() !== false && (!data.exists() || data.child('_owner').val() === auth.uid || root.child('teachers').child(auth.uid).child('role').val() === 'admin')",
+        "_owner": {
+          ".validate": "newData.val() === auth.uid || root.child('teachers').child(auth.uid).child('role').val() === 'admin'"
+        },
+        "$hash": {
+          ".read": true
+        }
+      }
+    },
+    "hanziAssignments": {
+      ".read": true,
+      ".indexOn": ["ownerUid", "groupId"],
+      "$aid": {
+        ".write": "auth != null && root.child('teachers').child(auth.uid).exists() && root.child('teachers').child(auth.uid).child('active').val() !== false && (!data.exists() || data.child('ownerUid').val() === auth.uid || root.child('teachers').child(auth.uid).child('role').val() === 'admin')",
+        ".validate": "newData.child('ownerUid').val() === auth.uid || (data.exists() && newData.child('ownerUid').val() === data.child('ownerUid').val())"
+      }
+    },
+    "hanziKeys": {
+      "$aid": {
+        ".read": "auth != null && (root.child('hanziAssignments').child($aid).child('ownerUid').val() === auth.uid || root.child('teachers').child(auth.uid).child('role').val() === 'admin')",
+        ".write": "auth != null && root.child('teachers').child(auth.uid).child('active').val() !== false && (root.child('hanziAssignments').child($aid).child('ownerUid').val() === auth.uid || newData.parent().parent().child('hanziAssignments').child($aid).child('ownerUid').val() === auth.uid || root.child('teachers').child(auth.uid).child('role').val() === 'admin')"
+      }
+    },
+    "hanziSessions": {
+      "$aid": {
+        ".read": "auth != null && (root.child('hanziAssignments').child($aid).child('ownerUid').val() === auth.uid || root.child('teachers').child(auth.uid).child('role').val() === 'admin')",
+        ".write": "auth != null && root.child('teachers').child(auth.uid).child('active').val() !== false && (root.child('hanziAssignments').child($aid).child('ownerUid').val() === auth.uid || newData.parent().parent().child('hanziAssignments').child($aid).child('ownerUid').val() === auth.uid || root.child('teachers').child(auth.uid).child('role').val() === 'admin')",
+        "$sid": {
+          ".read": true,
+          ".write": "root.child('hanziAssignments').child($aid).child('status').val() === 'published' && (!root.child('hanziAssignments').child($aid).child('dueAt').exists() || now <= root.child('hanziAssignments').child($aid).child('dueAt').val() || root.child('hanziAssignments').child($aid).child('allowLate').val() === true) && root.child('hanziReviews').child($aid).child($sid).child('status').val() !== 'reviewed'",
+          ".validate": "newData.hasChildren(['status', 'attemptsUsed']) && (newData.child('status').val() === 'draft' || newData.child('status').val() === 'submitted') && (newData.child('attemptsUsed').val() === data.child('attemptsUsed').val() || newData.child('attemptsUsed').val() <= newData.parent().parent().parent().child('hanziAssignments').child($aid).child('maxAttempts').val() || root.child('hanziReviews').child($aid).child($sid).child('status').val() === 'needs_revision')"
+        }
+      }
+    },
+    "hanziReviews": {
+      "$aid": {
+        ".read": "auth != null && (root.child('hanziAssignments').child($aid).child('ownerUid').val() === auth.uid || root.child('teachers').child(auth.uid).child('role').val() === 'admin')",
+        ".write": "auth != null && root.child('teachers').child(auth.uid).child('active').val() !== false && (root.child('hanziAssignments').child($aid).child('ownerUid').val() === auth.uid || newData.parent().parent().child('hanziAssignments').child($aid).child('ownerUid').val() === auth.uid || root.child('teachers').child(auth.uid).child('role').val() === 'admin')",
+        "$sid": {
+          ".read": true
+        }
+      }
+    }
+  }
+}

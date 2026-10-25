@@ -399,14 +399,18 @@ function renderRouteError(e){
     </div>
   </div>`;
 }
+// O'quvchi sahifalari: ?t= (test), ?hz= (Hanzi topshiriq), ?hg= (Hanzi guruh portali)
+const studentMode = !!(params.get('t') || params.get('hz') || params.get('hg'));
 window.addEventListener('load', ()=>{
   if(!fbReady) return renderSetup();
   if(params.get('t')) return studentEntry(params.get('t'));
+  if(params.get('hz') && window.HZ) return HZ.studentEntry(params.get('hz'));
+  if(params.get('hg') && window.HZ) return HZ.groupPortal(params.get('hg'));
   if(location.hash === '#admin'){ loadingScreen(); return; }
   renderLanding();
 });
 window.addEventListener('hashchange', ()=>{
-  if(!fbReady || params.get('t')) return;
+  if(!fbReady || studentMode) return;
   if(location.hash === '#admin'){ loadingScreen(); adminRoute(); }
   else renderLanding();
 });
@@ -414,7 +418,7 @@ if (fbReady){
   auth.onAuthStateChanged(u=>{
     currentUser = u;
     if(authBusy) return;
-    if(location.hash === '#admin' && !params.get('t')) adminRoute();
+    if(location.hash === '#admin' && !studentMode) adminRoute();
   });
 }
 
@@ -558,6 +562,7 @@ function doLogout(){
   if(allTestsListenerRef){ allTestsListenerRef.off(); allTestsListenerRef=null; }
   if(announceListenerRef){ announceListenerRef.off(); announceListenerRef=null; }
   if(sessListener) sessListener.off();
+  if(window.HZ) HZ.detach();
   tests = {}; sharedTests = {}; allTests = {}; curTestId = null; currentProfile = null;
   logEvent('auth.logout').then(()=>{
     window.__sessionLogged = false;
@@ -630,6 +635,7 @@ function renderAdmin(){
     <div class="tab ${adminTab==='tests'?'on':''}" data-tab="tests" onclick="setTab('tests')">📚 Testlarim</div>
     <div class="tab ${adminTab==='create'?'on':''}" data-tab="create" onclick="startNewTest()">➕ Yangi test</div>
     <div class="tab ${adminTab==='dash'?'on':''}" data-tab="dash" onclick="setTab('dash')">📊 Jonli natijalar</div>
+    ${window.HZ ? `<div class="tab ${adminTab==='hanzi'?'on':''}" data-tab="hanzi" onclick="setTab('hanzi')">汉 Hanzi mashqlari</div>` : ''}
     ${isAdmin ? `<div class="tab ${adminTab==='teachers'?'on':''}" data-tab="teachers" onclick="setTab('teachers')">👥 Laoshilar</div>` : ''}
     ${isAdmin ? `<div class="tab ${adminTab==='announce'?'on':''}" data-tab="announce" onclick="setTab('announce')">📢 E'lonlar</div>` : ''}
     ${isAdmin ? `<div class="tab ${adminTab==='alltests'?'on':''}" data-tab="alltests" onclick="setTab('alltests')">📋 Barcha testlar</div>` : ''}
@@ -681,6 +687,7 @@ function setTab(t){
   if(t==='alltests') renderAllTests();
   if(t==='logins') renderLogins();
   if(t==='backup') renderBackup();
+  if(t==='hanzi') { if(window.HZ) HZ.render(); else { adminTab='tests'; renderTestList(); } }
 }
 function renderAnnounce(){
   $('#tabBody').innerHTML = `
@@ -1488,6 +1495,7 @@ function renderLogs(){
           <option value="announce">E'lonlar</option>
           <option value="auth">Kirish/chiqish</option>
           <option value="trash">Korzinka</option>
+          <option value="hanzi">汉 Hanzi mashqlari</option>
         </select></div>
         <div><label>Davr</label><select id="lg-days" onchange="drawLogs()">
           <option value="1">Bugun</option>
@@ -1655,6 +1663,8 @@ function restoreTrash(owner, id){
   } else if(r.kind === 'announce'){
     job = db.ref('announcements/'+r.targetId).set(p);
     ev = ['announce.restore', { targetId:r.targetId, targetName:r.title }];
+  } else if(window.HZ && (r.kind === 'hanzi' || r.kind === 'hanziSession')){
+    const x = HZ.restoreTrash(r); job = x.job; ev = x.ev;
   } else { return alert('Bu turdagi yozuvni tiklab bo‘lmaydi.'); }
   job.then(()=> db.ref('trash/'+owner+'/'+id).remove())
      .then(()=> logEvent(ev[0], ev[1]))
@@ -1948,6 +1958,7 @@ async function buildBackup(){
     } catch(e){ /* egasi bo'lmagan test — o'tkazib yuboriladi */ }
   }
   if(Object.keys(sessions).length) data.sessions = sessions;
+  if(window.HZ) await HZ.backupExtra(data, bkProgress);   // Hanzi: kalitlar, javoblar, baholar
   bkProgress('');
   return data;
 }
@@ -1957,10 +1968,12 @@ function backupStats(d){
   return { teachers:n(d.teachers), tests:n(d.tests), sessions:sess,
            announcements:n(d.announcements), logs:n(d.logs),
            trash:Object.values(d.trash||{}).reduce((a,v)=>a+n(v),0),
-           logins:Object.values(d.logins||{}).reduce((a,v)=>a+n(v),0) };
+           logins:Object.values(d.logins||{}).reduce((a,v)=>a+n(v),0),
+           hanzi: (window.HZ && (d.hanziWords || d.hanziAssignments)) ? HZ.statsLine(d) : '' };
 }
 function statsLine(st){
-  return `${st.teachers} hisob · ${st.tests} test · ${st.sessions} natija · ${st.announcements} e'lon · ${st.logs} qayd · ${st.trash} korzinka · ${st.logins} kirish`;
+  return `${st.teachers} hisob · ${st.tests} test · ${st.sessions} natija · ${st.announcements} e'lon · ${st.logs} qayd · ${st.trash} korzinka · ${st.logins} kirish` +
+         (st.hanzi ? ' · ' + st.hanzi : '');
 }
 async function downloadBackup(silent){
   const btn = $('#bk-dl');
@@ -1991,7 +2004,7 @@ function loadRestoreFile(input){
     let d;
     try { d = JSON.parse(String(r.result||'')); }
     catch(e){ restoreData = null; return bkMsg('❌ Bu to‘g‘ri JSON fayl emas.', 'red'); }
-    if(!d || typeof d !== 'object' || (!d.teachers && !d.tests)){
+    if(!d || typeof d !== 'object' || (!d.teachers && !d.tests && !d.hanziAssignments)){
       restoreData = null;
       return bkMsg('❌ Faylda <b>teachers</b> ham, <b>tests</b> ham yo‘q — bu laoshi-test zaxirasi emasga o‘xshaydi.', 'red');
     }
@@ -2033,6 +2046,7 @@ async function doRestore(){
   Object.entries(d.logins || {}).forEach(([uid,items])=>
     Object.entries(items||{}).forEach(([id,v])=> put('logins/'+uid+'/'+id, v)));
   // logs ataylab tiklanmaydi — jurnal faqat qo'shilishga ochiq
+  if(window.HZ) await HZ.restoreExtra(d, put);   // Hanzi tugunlari (+ kod xeshlari qayta hisoblanadi)
 
   const paths = Object.keys(updates);
   if(!paths.length) return bkMsg('Faylda tiklanadigan narsa topilmadi.', 'red');
@@ -2526,5 +2540,7 @@ function renderResult(test, sess){
   </div>`;
 }
 </script>
+<!-- 汉字练习: Hanzi mashqlari moduli (alohida fayl; bo'lmasa sayt avvalgidek ishlayveradi) -->
+<script src="hanzi.js"></script>
 </body>
 </html>

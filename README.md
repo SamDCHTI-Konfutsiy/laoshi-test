@@ -440,6 +440,72 @@ Panel qayta ishlandi:
 - Sanalar `24.08.2026 · 14:32` ko'rinishida yoziladi (avval brauzer `2026 M08 24` deb chiqarardi)
 - Mobilda tugmalar butun kenglikni egallaydi, kartochkalar ixchamlashdi
 
+## 3.9 汉字 Hanzi mashqlari (yangi modul)
+
+Panelda yangi **汉 Hanzi mashqlari** tabi paydo bo'ladi (barcha laoshilar va administrator uchun).
+Kod alohida **`hanzi.js`** faylida — uni `index.html` yoniga yuklang. Bu fayl bo'lmasa, sayt avvalgidek
+ishlayveradi, faqat Hanzi tabi ko'rinmaydi.
+
+### Nima qila oladi
+- **📖 So'zlar bazasi** — barcha laoshilar uchun bitta: hanzi, pinyin (`ni3 hao3` avtomatik `nǐ hǎo` bo'ladi),
+  o'zbekcha tarjima, muqobil javoblar, HSK darajasi, teglar. HSK filtri, qidiruv, CSV import/eksport,
+  **⭐ HSK 1 namuna so'zlari** (52 ta), chiziq tartibi animatsiyasi.
+- **👥 Guruhlar va kodlar** — guruh yaratib, o'quvchilar ismini ro'yxat qilib qo'shasiz; har biriga
+  6 belgili **shaxsiy kod** beriladi. Kodlar varag'ini chop etish (QR bilan) yoki CSV.
+- **➕ Yangi topshiriq** — so'zlarni bazadan tanlash (yoki shu yerda yangi so'z qo'shish), mashq turlari:
+  ✍️ hanzi yozish, ⌨️ hanzi kiritish, 🔤 pinyin, 🌐 tarjima, 🔊 diktant. Muddat, ball, urinishlar soni,
+  米字格/田字格 katak, maslahatlar, tonlar majburiyligi, "natijani darhol ko'rsatish" rejimi.
+  Kimga: **ism bilan** (avvalgi testlar kabi, havolani olgan har kim) yoki **guruh kodi bilan**
+  (butun guruh yoki tanlangan o'quvchilar).
+- **QR va havola** — `...?hz=ID` (topshiriq) va `...?hg=ID` (guruh portali: o'quvchi kodini kiritib
+  o'ziga berilgan barcha topshiriqlarni ko'radi). QR sayt ichida yaratiladi, **⬇ QR (PNG)** bilan yuklab olinadi.
+- **✅ Tekshirish** — holatlar: *yuborilmagan → yuborilgan → tekshirilmoqda → qayta ishlash kerak → tekshirildi*.
+  Har bir savol uchun avtomatik xulosa, qo'lda yozilgan ieroglif rasmi, sizning xulosangiz (to'g'ri/noto'g'ri),
+  izoh, yakuniy ball. Avtomatik ball va laoshi bahosi **alohida** saqlanadi.
+- **📈 Statistika** — bajarilish foizi, tekshirilmaganlar, o'rtacha ball, topshiriq/o'quvchi kesimida,
+  **eng ko'p xato qilingan so'zlar**, CSV. Har topshiriq sahifasida **⬇ Excel**.
+- Jurnal (🧾 Qaydlar → "汉 Hanzi"), 🗑 Korzinka (topshiriq javoblari bilan tiklanadi) va 💾 Zaxira ham Hanzi'ni qamrab oladi.
+
+### Avtomatik tekshirish nimani tekshiradi (va nimani EMAS)
+- **Pinyin**: ton belgisi va ton raqami teng (`nǐ hǎo` = `ni3 hao3` = `nǐhǎo`); tonlarni ixtiyoriy qilish mumkin.
+- **Tarjima**: katta-kichik harf, tinish belgilari, `oʻ / o' / o‘` farqi hisobga olinmaydi; sinonimlarni
+  so'zga "boshqa tarjimalar" sifatida yozing. Bu matn solishtirish — ma'noni tushunmaydi, shuning uchun laoshi xulosasi ustun.
+- **Hanzi kiritish / diktant**: ieroglif aynan mos kelishi kerak.
+- **Hanzi yozish**: HanziWriter har bir chiziqni **ma'lum to'g'ri ieroglif** bilan solishtiradi
+  (tartib, yo'nalish, xatolar soni). Bu **OCR emas** — erkin chizilgan yozuvni taniy olmaydi; erkin yozuv
+  rasm sifatida saqlanadi va laoshi baholaydi.
+- Yozish va diktant mashqlarida ieroglif o'quvchi qurilmasiga yuboriladi (HanziWriter va ovoz uchun kerak) —
+  bular mashq uchun, maxfiy imtihon uchun emas. Pinyin/tarjima/hanzi javoblari esa faqat laoshida (`hanziKeys`) turadi
+  ("natijani darhol ko'rsatish" yoqilmagan bo'lsa). Avtomatik natija laoshi topshiriqni ochganda hisoblanadi.
+
+### Internet va oflayn
+- Yozish mashqi `cdn.jsdelivr.net` dan HanziWriter va ieroglif ma'lumotini yuklaydi. Yuklanmasa, o'sha savol
+  avtomatik **erkin yozish**ga o'tadi.
+- O'quvchi javoblari har o'zgarishda telefon xotirasiga ham yoziladi; internet uzilsa ham yo'qolmaydi va
+  aloqa tiklanganda yuboriladi.
+- Diktant qurilmaning xitoycha ovoziga bog'liq (yo'q bo'lsa sahifa ogohlantiradi).
+
+### ⚠️ Database Rules — majburiy
+To'liq qoidalar **`database.rules.json`** faylida. Firebase Console → Realtime Database → **Rules** ga shu
+faylni to'liq joylab **Publish** qiling (avval hozirgi qoidalaringizni nusxalab saqlab qo'ying).
+Fayl sizning mavjud bloklaringizni (README'dagi) o'z ichiga oladi, ustiga quyidagilar qo'shilgan:
+- `hanziWords`, `hanziGroups`, `hanziRoster`, `hanziAssignments`, `hanziKeys`, `hanziSessions`, `hanziReviews`;
+- **tuzatish:** `sessions/$testId/$sid` ga `".read": true`. Avvalgi qoidalarda o'quvchi o'z yozuvini o'qiy
+  olmasdi — natijada havolani qayta ochganda sahifa bo'sh qolardi, bloklangandan keyin "✓ Ruxsat" berilsa ham
+  sahifa o'zi yangilanmasdi. `$sid` 8 belgili tasodifiy kod, shuning uchun boshqa o'quvchining natijasini topib bo'lmaydi;
+- `system` va `announcements` bloklari README'da ko'rsatilmagan edi — faylga kod ishlashi uchun kerakli
+  ko'rinishda qo'shildi. Agar Console'dagi variantingiz farq qilsa, o'zingiznikini qoldiring.
+
+Qoidalar nimani kafolatlaydi: kalit va javoblarni faqat topshiriq egasi/admin o'qiydi; guruh kodlari ochiq
+joyda faqat xesh ko'rinishida; o'quvchi bahoni yoza olmaydi; muddat o'tgach (kechikishga ruxsat bo'lmasa)
+va "tekshirildi"dan keyin javob o'zgartirilmaydi; urinishlar soni server tomonda cheklanadi.
+**Cheklov (avvalgi testlar bilan bir xil):** o'quvchilar hisobsiz kirgani uchun, kodni bilgan kishi o'sha
+o'quvchi nomidan yozishi mumkin — kodni maxfiy saqlash o'quvchiga topshiriladi.
+
+### Joylash
+- **A usul:** `index.html`, `hanzi.js`, `config.js` uchalasini yuklang.
+- **B usul (GitHub Actions):** `hanzi.js` ni repoga qo'shing — workflow butun papkani nashr qiladi, o'zgartirish shart emas.
+
 ## 4. Ishlatish
 
 ### Test yaratish formati
