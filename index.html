@@ -655,7 +655,12 @@ function renderAdmin(){
   if(isAdmin){
     // Administrator "Jonli natijalar" bo'limida BARCHA laoshilarning testlarini ko'ra olishi uchun
     allTestsListenerRef = db.ref('tests');
-    allTestsListenerRef.on('value', snap=>{ allTests = snap.val()||{}; refreshDashSelect(); });
+    allTestsListenerRef.on('value', snap=>{
+      const first = !Object.keys(allTests||{}).length;
+      allTests = snap.val()||{};
+      // Testlar ro'yxati kech kelsa, "Jonli natijalar" bo'sh qolib ketmasin
+      if(first && adminTab==='dash') renderDash(); else refreshDashSelect();
+    });
   }
   if(announceListenerRef) announceListenerRef.off();
   announceListenerRef = db.ref('announcements').limitToLast(3);
@@ -2127,8 +2132,25 @@ function renderDash(){
 let curSessions = {};
 function attachSessions(){
   if(sessListener) sessListener.off();
-  sessListener = db.ref('sessions/'+curTestId);
-  sessListener.on('value', snap=>{ curSessions = snap.val()||{}; drawDash(); });
+  curSessions = {};
+  const tid = curTestId;
+  sessListener = db.ref('sessions/'+tid);
+  if($('#dash-table')) $('#dash-table').innerHTML = `<p class="muted">Yuklanmoqda…</p>`;
+  sessListener.on('value', snap=>{ if(tid!==curTestId) return; curSessions = snap.val()||{}; drawDash(); },
+    e=>{
+      // Avval xato jim yutilib, "Hali hech kim kirmadi" ko'rinardi — endi sababi ekranda chiqadi
+      console.warn('sessions/'+tid, e);
+      if(tid!==curTestId || !$('#dash-table')) return;
+      const t = dashTestsSource()[tid] || {};
+      const denied = /permission/i.test((e && (e.code||e.message))||'');
+      $('#dash-stats').innerHTML = '';
+      $('#dash-map').innerHTML = '';
+      $('#dash-table').innerHTML = `<div class="note red"><b>Natijalarni o'qib bo'lmadi:</b> ${esc((e && e.message) || String(e))}
+        ${denied ? `<br><br>Bu Firebase <b>Database Rules</b> ruxsat bermayotganini bildiradi. Tekshiring:
+          <br>• Sizning hisobingiz (<b>teachers/${esc(currentUser.uid)}</b>) da <b>role = "admin"</b> va <b>active</b> false emas;
+          <br>• Testning egasi (ownerUid): <b>${esc(t.ownerUid||'—')}</b>${t.ownerName?' ('+esc(t.ownerName)+')':''};
+          <br>• Firebase Console → Realtime Database → Rules da <b>database.rules.json</b> dagi <b>sessions</b> bloki turibdi.` : ''}</div>`;
+    });
 }
 function statusInfo(s, t){
   if(s.status==='locked')   return {pill:'p-red',  dot:'d-red',   txt:'🔒 Bloklangan'};
